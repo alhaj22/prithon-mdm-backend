@@ -177,6 +177,25 @@ io.on('connection', (socket) => {
         }
     });
 
+    // Installed Applications Inventory from Phone
+    socket.on('apps_inventory', ({ deviceId, apps }) => {
+        if (!connectedDevices[deviceId]) {
+            connectedDevices[deviceId] = {
+                brand: 'Android',
+                model: 'Device',
+                status: 'NORMAL',
+                online: true,
+                socketId: socket.id,
+                lastSeen: new Date().toLocaleTimeString(),
+                isDeviceOwner: true
+            };
+        }
+        connectedDevices[deviceId].apps = apps || [];
+        saveFleetState();
+        console.log(`[APPS INVENTORY] Received ${apps ? apps.length : 0} apps from device ${deviceId}`);
+        io.emit('device_list_updated', connectedDevices);
+    });
+
     // Periodic heartbeat from phone
     socket.on('heartbeat', ({ deviceId, battery, status, customerName, customerPhone, loanId, emiAmount }) => {
         if (connectedDevices[deviceId]) {
@@ -210,6 +229,14 @@ io.on('connection', (socket) => {
 // 2b. Fleet REST API Endpoint
 app.get('/api/devices', (req, res) => {
     res.json(connectedDevices);
+});
+
+// 2b-2. Device Installed Applications Endpoint
+app.get('/api/devices/:deviceId/apps', (req, res) => {
+    const { deviceId } = req.params;
+    const dev = connectedDevices[deviceId];
+    if (!dev) return res.status(404).json({ error: 'Device not found' });
+    res.json({ success: true, count: dev.apps ? dev.apps.length : 0, apps: dev.apps || [] });
 });
 
 // 2c. Save/Update Customer Details via REST
