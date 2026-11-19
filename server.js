@@ -59,10 +59,9 @@ app.get('/api/provisioning-payload', (req, res) => {
     const activeHost = host || reqHost || `${SERVER_HOST}:${PORT}`;
     const baseOrigin = activeHost.startsWith('http') ? activeHost : `${proto}://${activeHost}`;
     
-    // High-Availability Global CDN download URL (Permanent, 0.95s download in India)
-    const permanentCdnUrl = "https://github.com/alhaj22/prithon-dpc/releases/download/v1.0.0/app-debug.apk";
-    const downloadLocation = req.query.local === 'true' ? `${baseOrigin}/download/app-debug.apk` : permanentCdnUrl;
-    const checksum = "ylwvEXy6aiJ5dNuh1M9xRGFjsJDzWz9a9kbmF72WDwY";
+    // Direct Render Cloud Download URL (Direct 200 OK without multi-hop 302 redirects)
+    const downloadLocation = `${baseOrigin}/download/app-debug.apk`;
+    const checksum = getApkChecksum();
 
     const payload = {
         "android.app.extra.PROVISIONING_DEVICE_ADMIN_COMPONENT_NAME": "com.prithon.dpc/com.prithon.dpc.receivers.PrithonAdminReceiver",
