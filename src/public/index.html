@@ -676,6 +676,24 @@
                         </div>
                     </div>
 
+                    ${dev.customerName ? `
+                        <div style="background: rgba(37, 99, 235, 0.12); border: 1px solid rgba(37, 99, 235, 0.3); border-radius: 6px; padding: 10px 14px; margin: 12px 0;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                <span style="font-size: 14px; font-weight: 700; color: #fff;">👤 ${escapeHtml(dev.customerName)}</span>
+                                <span style="font-size: 12px; color: #60a5fa; font-weight: 600;">📞 ${escapeHtml(dev.customerPhone || 'N/A')}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; font-size: 12px; color: #94a3b8; margin-top: 4px;">
+                                <span>Loan: <strong style="color: #cbd5e1;">${escapeHtml(dev.loanId || 'N/A')}</strong></span>
+                                <span>EMI: <strong style="color: #38bdf8;">₹${escapeHtml(dev.emiAmount || '0')}</strong></span>
+                            </div>
+                        </div>
+                    ` : `
+                        <div style="background: rgba(148, 163, 184, 0.05); border: 1px dashed rgba(148, 163, 184, 0.2); border-radius: 6px; padding: 10px 12px; margin: 12px 0; font-size: 12px; color: #94a3b8; display: flex; justify-content: space-between; align-items: center;">
+                            <span>Customer: <em>Fill Form on Phone or Assign</em></span>
+                            <button onclick="promptCustomerDetails('${id}')" style="background: #2563eb; color: #fff; border: none; border-radius: 4px; padding: 4px 10px; font-size: 11px; cursor: pointer; font-weight: 600;">Assign</button>
+                        </div>
+                    `}
+
                     <!-- Quick Action Buttons Directly Below Device Name -->
                     <div class="device-actions-row">
                         <button class="btn-action btn-lock ${isLocked ? 'muted' : ''}" onclick="issueCommand('${id}', 'LOCK')">
@@ -728,6 +746,28 @@
                 if (!response.ok) alert(res.error || 'Command dispatch failed');
             } catch (err) {
                 alert('Network error communicating with control plane: ' + err.message);
+            }
+        }
+
+        async function promptCustomerDetails(deviceId) {
+            const current = registeredDevices[deviceId] || {};
+            const customerName = prompt('Enter Customer Full Name:', current.customerName || '');
+            if (customerName === null) return;
+            const customerPhone = prompt('Enter Customer Mobile Number:', current.customerPhone || '');
+            if (customerPhone === null) return;
+            const loanId = prompt('Enter Loan / Account ID:', current.loanId || '');
+            if (loanId === null) return;
+            const emiAmount = prompt('Enter Monthly EMI Amount (INR):', current.emiAmount || '');
+            if (emiAmount === null) return;
+
+            try {
+                await fetch(`/api/devices/${encodeURIComponent(deviceId)}/customer`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ customerName, customerPhone, loanId, emiAmount })
+                });
+            } catch (err) {
+                alert('Failed to update customer: ' + err.message);
             }
         }
 

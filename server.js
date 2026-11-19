@@ -38,8 +38,31 @@ function getLocalIpAddress() {
 const SERVER_HOST = getLocalIpAddress();
 const PORT = process.env.PORT || 4000;
 
-// In-Memory Fleet State (Production uses Redis Cluster)
+// In-Memory & Persistent Fleet State
+const dataDir = path.join(__dirname, 'data');
+if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+const stateFilePath = path.join(dataDir, 'fleet_state.json');
+
 let connectedDevices = {};
+if (fs.existsSync(stateFilePath)) {
+    try {
+        connectedDevices = JSON.parse(fs.readFileSync(stateFilePath, 'utf8'));
+        for (const k in connectedDevices) {
+            connectedDevices[k].online = false;
+            connectedDevices[k].socketId = null;
+        }
+    } catch (e) {
+        connectedDevices = {};
+    }
+}
+
+function saveFleetState() {
+    try {
+        fs.writeFileSync(stateFilePath, JSON.stringify(connectedDevices, null, 2));
+    } catch (e) {
+        console.error('Failed to save fleet state:', e);
+    }
+}
 
 // Helper: Calculate URL-safe Base64 SHA-256 for Android Enterprise Provisioning
 function getApkChecksum() {
@@ -93,19 +116,51 @@ io.on('connection', (socket) => {
 
     // Register newly connected DPC Agent
     socket.on('register_device', (device) => {
+        const existing = connectedDevices[device.deviceId] || {};
         connectedDevices[device.deviceId] = {
+            ...existing,
             socketId: socket.id,
-            brand: device.brand || 'Android',
-            model: device.model || 'Device',
-            battery: device.battery ?? 100,
-            androidVersion: device.androidVersion || 'Unknown',
-            status: device.status || 'NORMAL',
+            brand: device.brand || existing.brand || 'Android',
+            model: device.model || existing.model || 'Device',
+            battery: device.battery ?? existing.battery ?? 100,
+            androidVersion: device.androidVersion || existing.androidVersion || 'Unknown',
+            status: device.status || existing.status || 'NORMAL',
             online: true,
             ip: socket.handshake.address,
             lastSeen: new Date().toLocaleTimeString(),
-            isDeviceOwner: device.isDeviceOwner ?? true
+            isDeviceOwner: device.isDeviceOwner ?? true,
+            customerName: device.customerName || existing.customerName || '',
+            customerPhone: device.customerPhone || existing.customerPhone || '',
+            loanId: device.loanId || existing.loanId || '',
+            emiAmount: device.emiAmount || existing.emiAmount || '',
+            dueDate: device.dueDate || existing.dueDate || ''
         };
-        console.log(`[DEVICE REGISTERED] ${device.brand} ${device.model} (${device.deviceId}) - Status: ${device.status}`);
+        saveFleetState();
+        console.log(`[DEVICE REGISTERED] ${device.brand} ${device.model} (${device.deviceId}) - Customer: ${connectedDevices[device.deviceId].customerName || 'None'}`);
+        io.emit('device_list_updated', connectedDevices);
+    });
+
+    // Customer details submitted from Phone
+    socket.on('register_customer', (data) => {
+        const { deviceId, customerName, customerPhone, loanId, emiAmount, dueDate } = data;
+        if (!connectedDevices[deviceId]) {
+            connectedDevices[deviceId] = {
+                brand: 'Android',
+                model: 'Device',
+                status: 'NORMAL',
+                online: true,
+                socketId: socket.id,
+                lastSeen: new Date().toLocaleTimeString(),
+                isDeviceOwner: true
+            };
+        }
+        connectedDevices[deviceId].customerName = customerName || '';
+        connectedDevices[deviceId].customerPhone = customerPhone || '';
+        connectedDevices[deviceId].loanId = loanId || '';
+        connectedDevices[deviceId].emiAmount = emiAmount || '';
+        connectedDevices[deviceId].dueDate = dueDate || '';
+        saveFleetState();
+        console.log(`[CUSTOMER SAVED via Socket] Device: ${deviceId} -> ${customerName} (${customerPhone})`);
         io.emit('device_list_updated', connectedDevices);
     });
 
@@ -116,16 +171,21 @@ io.on('connection', (socket) => {
             connectedDevices[deviceId].online = true;
             connectedDevices[deviceId].socketId = socket.id;
             connectedDevices[deviceId].lastSeen = new Date().toLocaleTimeString();
+            saveFleetState();
             console.log(`[STATUS CHANGE] Device ${deviceId} -> ${status}`);
             io.emit('device_list_updated', connectedDevices);
         }
     });
 
     // Periodic heartbeat from phone
-    socket.on('heartbeat', ({ deviceId, battery, status }) => {
+    socket.on('heartbeat', ({ deviceId, battery, status, customerName, customerPhone, loanId, emiAmount }) => {
         if (connectedDevices[deviceId]) {
             if (battery !== undefined) connectedDevices[deviceId].battery = battery;
             if (status !== undefined) connectedDevices[deviceId].status = status;
+            if (customerName) connectedDevices[deviceId].customerName = customerName;
+            if (customerPhone) connectedDevices[deviceId].customerPhone = customerPhone;
+            if (loanId) connectedDevices[deviceId].loanId = loanId;
+            if (emiAmount) connectedDevices[deviceId].emiAmount = emiAmount;
             connectedDevices[deviceId].online = true;
             connectedDevices[deviceId].socketId = socket.id;
             connectedDevices[deviceId].lastSeen = new Date().toLocaleTimeString();
@@ -152,6 +212,30 @@ app.get('/api/devices', (req, res) => {
     res.json(connectedDevices);
 });
 
+// 2c. Save/Update Customer Details via REST
+app.post('/api/devices/:deviceId/customer', (req, res) => {
+    const { deviceId } = req.params;
+    const { customerName, customerPhone, loanId, emiAmount, dueDate } = req.body;
+    if (!connectedDevices[deviceId]) {
+        connectedDevices[deviceId] = {
+            brand: 'Android',
+            model: 'Device',
+            status: 'NORMAL',
+            online: false,
+            lastSeen: new Date().toLocaleTimeString(),
+            isDeviceOwner: true
+        };
+    }
+    connectedDevices[deviceId].customerName = customerName || '';
+    connectedDevices[deviceId].customerPhone = customerPhone || '';
+    connectedDevices[deviceId].loanId = loanId || '';
+    connectedDevices[deviceId].emiAmount = emiAmount || '';
+    connectedDevices[deviceId].dueDate = dueDate || '';
+    saveFleetState();
+    io.emit('device_list_updated', connectedDevices);
+    res.json({ success: true, device: connectedDevices[deviceId] });
+});
+
 // 3. REST API to trigger Remote Commands
 app.post('/api/devices/:deviceId/command', (req, res) => {
     const { deviceId } = req.params;
@@ -163,7 +247,16 @@ app.post('/api/devices/:deviceId/command', (req, res) => {
     }
 
     console.log(`[DISPATCH COMMAND] Sending ${command} to device: ${deviceId}`);
-    io.to(target.socketId).emit('server_command', { command, timestamp: Date.now() });
+    io.to(target.socketId).emit('server_command', { 
+        command, 
+        customer: {
+            name: target.customerName || '',
+            phone: target.customerPhone || '',
+            loanId: target.loanId || '',
+            emiAmount: target.emiAmount || ''
+        },
+        timestamp: Date.now() 
+    });
 
     // Optimistically update status
     if (command === 'LOCK') target.status = 'LOCKED';
