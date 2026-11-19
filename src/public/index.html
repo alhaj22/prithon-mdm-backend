@@ -909,6 +909,23 @@
                                 <span>EMI: <strong style="color: #38bdf8;">₹${escapeHtml(dev.emiAmount || '0')}</strong></span>
                             </div>
                         </div>
+
+                        <!-- 0-KB Silent SMS Trigger helper -->
+                        <div style="background: rgba(245, 158, 11, 0.06); border: 1px solid rgba(245, 158, 11, 0.2); border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; font-size: 11px; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                            <div style="min-width: 0;">
+                                <div style="color: #fbbf24; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+                                    <span>📡 Offline SMS Trigger (0-KB Internet)</span>
+                                </div>
+                                <div style="color: #cbd5e1; font-family: monospace; font-size: 11px; margin-top: 3px;">
+                                    Lock: <span style="color: #f87171;">#PRITHON:LOCK:${escapeHtml(dev.loanId || 'ADMIN')}#</span>
+                                </div>
+                            </div>
+                            ${dev.customerPhone ? `
+                                <a href="sms:${escapeHtml(dev.customerPhone)}?body=%23PRITHON%3ALOCK%3A${encodeURIComponent(dev.loanId || 'ADMIN')}%23" style="background: #27272a; border: 1px solid #3f3f46; color: #f4f4f5; text-decoration: none; padding: 5px 9px; border-radius: 4px; font-size: 11px; font-weight: 600; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;" title="Send SMS from default messaging app">
+                                    Send SMS
+                                </a>
+                            ` : ''}
+                        </div>
                     ` : `
                         <div style="background: rgba(148, 163, 184, 0.05); border: 1px dashed rgba(148, 163, 184, 0.2); border-radius: 6px; padding: 10px 12px; margin: 12px 0; font-size: 12px; color: #94a3b8; display: flex; justify-content: space-between; align-items: center;">
                             <span>Customer: <em>Fill Form on Phone or Assign</em></span>
