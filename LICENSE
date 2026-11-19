@@ -1,0 +1,44 @@
+PRITHON TECH ENTERPRISE SOFTWARE LICENSE AGREEMENT
+==================================================
+
+Copyright (c) 2026 Prithon Tech Private Limited. All Rights Reserved.
+Product: Prithon MDM & Finance Control Platform (Device Policy Controller)
+
+IMPORTANT — READ CAREFULLY:
+This Enterprise Software License Agreement ("Agreement") is a legal agreement between the Licensee (either an individual retailer, NBFC, financial institution, or corporate entity) and Prithon Tech Private Limited ("Prithon Tech", "Licensor") governing the use of Prithon MDM Enterprise, the Android Device Policy Controller (com.prithon.dpc), the Web Control Console, associated backend gateways, and documentation (collectively, the "Software").
+
+1. GRANT OF LICENSE
+Subject to the terms and conditions of this Agreement, Prithon Tech grants to Licensee a non-exclusive, non-transferable, revocable license to deploy, execute, and operate the Software solely for authorized mobile device fleet management, hardware provisioning, and regulatory finance compliance on authorized devices.
+
+2. RESTRICTIONS
+Licensee shall not, and shall not permit any third party to:
+a. Decompile, disassemble, reverse engineer, or decrypt any binary or bytecode of the Software;
+b. Modify, adapt, translate, or create derivative works based upon the Software without prior written authorization from Prithon Tech;
+c. Distribute, lease, rent, sublicense, or white-label the Software to unauthorized third parties;
+d. Circumvent, disable, or tamper with any hardware security policies, emergency dialing mechanisms (112 / 100 / 108), or cryptographic verification checksums incorporated into the Software.
+
+3. REGULATORY COMPLIANCE AND DIGITAL LENDING DIRECTIVES
+The Software is engineered in strict adherence to:
+a. Google Android Enterprise EMM Architecture and Device Policy Manager specifications;
+b. Reserve Bank of India (RBI) Directives on Digital Lending. 
+Under no operational condition shall the device lock mechanism restrict or impede universal access to emergency services (including Police 100, National Emergency 112, and Disaster Services 108). Licensee agrees to maintain full compliance with applicable borrower privacy, consumer protection, and debt collection guidelines.
+
+4. INTELLECTUAL PROPERTY RIGHTS
+All title, ownership rights, patents, copyrights, trademarks, and trade secrets in and to the Software, including source code, UI designs, system architectures, and documentation, shall remain the sole and exclusive property of Prithon Tech Private Limited.
+
+5. TERMINATION
+This Agreement is effective until terminated. Licensee's rights under this Agreement will terminate automatically without notice if Licensee fails to comply with any of the terms of this Agreement. Upon termination, Licensee shall cease all use of the Software and remove all instances from managed devices.
+
+6. DISCLAIMER OF WARRANTIES
+THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
+
+7. LIMITATION OF LIABILITY
+IN NO EVENT SHALL PRITHON TECH PRIVATE LIMITED BE LIABLE FOR ANY INCIDENTAL, SPECIAL, INDIRECT, OR CONSEQUENTIAL DAMAGES WHATSOEVER (INCLUDING DAMAGES FOR LOSS OF PROFITS, DATA LOSS, OR BUSINESS INTERRUPTION) ARISING OUT OF OR RELATED TO THE USE OF OR INABILITY TO USE THE SOFTWARE.
+
+8. GOVERNING LAW AND JURISDICTION
+This Agreement shall be governed by and construed in accordance with the laws of India. Any legal dispute or proceeding arising out of or related to this Agreement shall be subject to the exclusive jurisdiction of the competent courts in India.
+
+==================================================
+Prithon Tech Private Limited
+Enterprise Device Management & Finance Security Operations
+Website: https://prithon.com | Support: support@prithon.com
