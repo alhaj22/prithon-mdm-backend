@@ -12,6 +12,11 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'src', 'public')));
 
+// Explicit Dashboard Route
+app.get('/dashboard', (req, res) => {
+    res.sendFile(path.join(__dirname, 'src', 'public', 'dashboard.html'));
+});
+
 // Serve APK downloads for Android Enterprise Setup Wizard
 const apkDir = path.join(__dirname, 'apk');
 if (!fs.existsSync(apkDir)) {

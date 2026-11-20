@@ -3,250 +3,125 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Control Console | Prithon Tech MDM</title>
+    <title>Prithon MDM | Zero-Default Device Finance SaaS</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-    <script src="/socket.io/socket.io.js"></script>
+    <!-- Google Fonts: Inter & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- QRCode.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         :root {
-            --bg: #09090b;
-            --surface: #18181b;
-            --surface-hover: #222226;
-            --border: #27272a;
-            --text-primary: #fafafa;
-            --text-secondary: #a1a1aa;
-            --text-tertiary: #71717a;
-            --danger: #dc2626;
-            --danger-hover: #b91c1c;
-            --success: #16a34a;
-            --success-hover: #15803d;
-            --primary: #2563eb;
-            --primary-hover: #1d4ed8;
+            --bg-base: #060911;
+            --bg-surface: #0B111E;
+            --bg-card: #10192C;
+            --bg-card-hover: #15223B;
+            --border-subtle: rgba(255, 255, 255, 0.08);
+            --border-active: rgba(0, 229, 255, 0.35);
+            --cyan-primary: #00E5FF;
+            --cyan-glow: rgba(0, 229, 255, 0.25);
+            --emerald: #10B981;
+            --emerald-glow: rgba(16, 185, 129, 0.25);
+            --red-alert: #EF4444;
+            --text-main: #F8FAFC;
+            --text-muted: #94A3B8;
+            --text-dim: #64748B;
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', -apple-system, sans-serif;
+        }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background: var(--bg);
-            color: var(--text-primary);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            line-height: 1.5;
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            line-height: 1.6;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
         }
 
-        .layout {
+        /* Ambient Glow Background */
+        .ambient-glow {
+            position: fixed;
+            top: -200px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 800px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(0, 229, 255, 0.08) 0%, rgba(16, 185, 129, 0.03) 40%, transparent 70%);
+            filter: blur(80px);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
             max-width: 1200px;
-            width: 100%;
             margin: 0 auto;
-            padding: 32px 24px;
-            flex: 1;
+            padding: 0 24px;
+            position: relative;
+            z-index: 1;
         }
 
-        header {
+        /* Navigation */
+        nav {
+            position: sticky;
+            top: 0;
+            background: rgba(6, 9, 17, 0.85);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--border-subtle);
+            z-index: 100;
+            padding: 16px 0;
+        }
+
+        .nav-inner {
             display: flex;
+            align-items: center;
             justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid var(--border);
-            padding-bottom: 20px;
-            margin-bottom: 28px;
         }
 
-        .header-title {
-            font-size: 16px;
-            font-weight: 600;
-            letter-spacing: -0.01em;
+        .logo {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
+            text-decoration: none;
+            color: var(--text-main);
+            font-weight: 800;
+            font-size: 1.15rem;
+            letter-spacing: -0.5px;
         }
 
-        .header-title svg {
-            width: 20px;
-            height: 20px;
-            fill: none;
-            stroke: var(--text-primary);
-            stroke-width: 2;
-        }
-
-        .system-tag {
-            font-size: 11px;
-            font-weight: 500;
-            color: var(--text-secondary);
-            border: 1px solid var(--border);
-            padding: 2px 8px;
+        .logo-badge {
+            background: rgba(0, 229, 255, 0.12);
+            border: 1px solid rgba(0, 229, 255, 0.3);
+            color: var(--cyan-primary);
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 2px 6px;
             border-radius: 4px;
             text-transform: uppercase;
         }
 
-        .connection-indicator {
+        .nav-links {
             display: flex;
             align-items: center;
-            gap: 8px;
-            font-size: 12px;
-            color: var(--text-secondary);
+            gap: 28px;
+            list-style: none;
         }
 
-        .indicator-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: var(--success);
-        }
-
-        .indicator-dot.offline {
-            background: var(--danger);
-        }
-
-        /* Metric Summary Strip */
-        .metric-strip {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 16px;
-            margin-bottom: 28px;
-        }
-
-        .metric-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            padding: 16px 20px;
-        }
-
-        .metric-label {
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--text-secondary);
-            margin-bottom: 6px;
-        }
-
-        .metric-value {
-            font-size: 24px;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        /* Tabs Navigation */
-        .tab-bar {
-            display: flex;
-            gap: 8px;
-            border-bottom: 1px solid var(--border);
-            margin-bottom: 24px;
-        }
-
-        .tab-button {
-            background: none;
-            border: none;
-            border-bottom: 2px solid transparent;
-            color: var(--text-secondary);
-            font-size: 13px;
+        .nav-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.9rem;
             font-weight: 500;
-            padding: 10px 16px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 8px;
+            transition: color 0.2s ease;
         }
 
-        .tab-button svg {
-            width: 16px;
-            height: 16px;
-            stroke: currentColor;
-            fill: none;
-            stroke-width: 2;
-        }
-
-        .tab-button:hover {
-            color: var(--text-primary);
-        }
-
-        .tab-button.active {
-            color: var(--text-primary);
-            border-bottom-color: var(--primary);
-        }
-
-        .tab-panel {
-            display: none;
-        }
-
-        .tab-panel.active {
-            display: block;
-        }
-
-        /* Fleet Grid */
-        .fleet-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-            gap: 16px;
-        }
-
-        .device-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            padding: 20px;
-        }
-
-        .device-card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 16px;
-            border-bottom: 1px solid var(--border);
-            padding-bottom: 12px;
-        }
-
-        .device-title {
-            font-size: 15px;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        .device-id {
-            font-size: 12px;
-            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-            color: var(--text-tertiary);
-            margin-top: 2px;
-        }
-
-        .badge {
-            font-size: 11px;
-            font-weight: 600;
-            padding: 3px 8px;
-            border-radius: 3px;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-        }
-
-        .badge-normal {
-            background: rgba(22, 163, 74, 0.15);
-            color: #4ade80;
-            border: 1px solid rgba(22, 163, 74, 0.3);
-        }
-
-        .badge-locked {
-            background: rgba(220, 38, 38, 0.15);
-            color: #f87171;
-            border: 1px solid rgba(220, 38, 38, 0.3);
-        }
-
-        .data-table {
-            width: 100%;
-            margin-bottom: 16px;
-            font-size: 13px;
-        }
-
-        .data-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 4px 0;
-            color: var(--text-secondary);
-        }
-
-        .data-row span:last-child {
-            color: var(--text-primary);
-            font-weight: 500;
+        .nav-links a:hover {
+            color: var(--cyan-primary);
         }
 
         .btn {
@@ -254,973 +129,922 @@
             align-items: center;
             justify-content: center;
             gap: 8px;
-            width: 100%;
-            padding: 10px 16px;
-            border: 1px solid transparent;
-            border-radius: 4px;
-            font-size: 13px;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 0.9rem;
             font-weight: 600;
+            text-decoration: none;
             cursor: pointer;
-            transition: background-color 0.15s ease;
-        }
-
-        .btn svg {
-            width: 15px;
-            height: 15px;
-            stroke: currentColor;
-            fill: none;
-            stroke-width: 2;
-        }
-
-        .btn-danger {
-            background: var(--danger);
-            color: #ffffff;
-        }
-
-        .btn-danger:hover {
-            background: var(--danger-hover);
-        }
-
-        .btn-success {
-            background: var(--success);
-            color: #ffffff;
-        }
-
-        .btn-success:hover {
-            background: var(--success-hover);
+            transition: all 0.2s ease;
+            border: none;
         }
 
         .btn-primary {
-            background: var(--primary);
-            color: #ffffff;
+            background: linear-gradient(135deg, #00E5FF 0%, #0099FF 100%);
+            color: #060911;
+            box-shadow: 0 4px 20px var(--cyan-glow);
         }
 
         .btn-primary:hover {
-            background: var(--primary-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 28px rgba(0, 229, 255, 0.4);
         }
 
-        .device-actions-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-top: 14px;
-            margin-bottom: 16px;
+        .btn-secondary {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main);
         }
 
-        .btn-action {
+        .btn-secondary:hover {
+            background: var(--bg-card-hover);
+            border-color: rgba(255, 255, 255, 0.16);
+            transform: translateY(-1px);
+        }
+
+        .btn-emerald {
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            color: #ffffff;
+            box-shadow: 0 4px 16px var(--emerald-glow);
+        }
+
+        .btn-emerald:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 24px rgba(16, 185, 129, 0.4);
+        }
+
+        /* Hero Section */
+        .hero {
+            padding: 80px 0 60px;
+            text-align: center;
+        }
+
+        .pill-tag {
             display: inline-flex;
             align-items: center;
-            justify-content: center;
-            gap: 6px;
-            padding: 9px 12px;
-            border-radius: 4px;
-            font-size: 12px;
+            gap: 8px;
+            padding: 6px 14px;
+            background: rgba(0, 229, 255, 0.08);
+            border: 1px solid rgba(0, 229, 255, 0.25);
+            border-radius: 999px;
+            font-size: 0.8rem;
             font-weight: 600;
-            letter-spacing: 0.02em;
-            cursor: pointer;
-            transition: all 0.15s ease;
-            text-transform: uppercase;
+            color: var(--cyan-primary);
+            margin-bottom: 24px;
         }
 
-        .btn-action svg {
-            width: 14px;
-            height: 14px;
-            stroke: currentColor;
-            fill: none;
-            stroke-width: 2;
+        .pill-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--cyan-primary);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--cyan-primary);
+            animation: pulse 2s infinite;
         }
 
-        .btn-action:active {
-            transform: scale(0.98);
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(0.85); }
         }
 
-        .btn-lock {
-            background: var(--danger);
-            border: 1px solid var(--danger);
-            color: #ffffff;
+        .hero h1 {
+            font-size: 3.4rem;
+            font-weight: 800;
+            letter-spacing: -1.5px;
+            line-height: 1.15;
+            margin-bottom: 20px;
+            background: linear-gradient(180deg, #FFFFFF 30%, #94A3B8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
 
-        .btn-lock:hover {
-            background: var(--danger-hover);
-            border-color: var(--danger-hover);
+        .hero p {
+            max-width: 680px;
+            margin: 0 auto 36px;
+            font-size: 1.15rem;
+            color: var(--text-muted);
+            line-height: 1.7;
         }
 
-        .btn-lock.muted {
-            background: rgba(220, 38, 38, 0.12);
-            border: 1px solid rgba(220, 38, 38, 0.35);
-            color: #fca5a5;
-        }
-
-        .btn-lock.muted:hover {
-            background: var(--danger);
-            color: #ffffff;
-        }
-
-        .btn-unlock {
-            background: var(--success);
-            border: 1px solid var(--success);
-            color: #ffffff;
-        }
-
-        .btn-unlock:hover {
-            background: var(--success-hover);
-            border-color: var(--success-hover);
-        }
-
-        .btn-unlock.muted {
-            background: rgba(22, 163, 74, 0.12);
-            border: 1px solid rgba(22, 163, 74, 0.35);
-            color: #86efac;
-        }
-
-        .btn-unlock.muted:hover {
-            background: var(--success);
-            color: #ffffff;
-        }
-
-        /* Modal Styles */
-        .modal-backdrop {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            background: rgba(0, 0, 0, 0.78);
-            backdrop-filter: blur(4px);
-            z-index: 9999;
+        .hero-ctas {
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 20px;
-        }
-
-        .modal-container {
-            background: #121215;
-            border: 1px solid #27272a;
-            border-radius: 8px;
-            width: 100%;
-            max-width: 820px;
-            max-height: 85vh;
-            display: flex;
-            flex-direction: column;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.7);
-        }
-
-        .modal-header {
-            padding: 16px 20px;
-            border-bottom: 1px solid #27272a;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .modal-title {
-            font-size: 16px;
-            font-weight: 700;
-            color: #ffffff;
-        }
-
-        .modal-subtitle {
-            font-size: 12px;
-            color: #71717a;
-            margin-top: 2px;
-        }
-
-        .btn-close-modal {
-            background: transparent;
-            border: none;
-            color: #a1a1aa;
-            font-size: 24px;
-            cursor: pointer;
-            line-height: 1;
-            padding: 4px;
-        }
-
-        .btn-close-modal:hover {
-            color: #ffffff;
-        }
-
-        .btn-refresh-apps {
-            background: rgba(37, 99, 235, 0.15);
-            border: 1px solid rgba(37, 99, 235, 0.35);
-            color: #60a5fa;
-            border-radius: 4px;
-            padding: 6px 12px;
-            font-size: 11px;
-            font-weight: 600;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .btn-refresh-apps svg {
-            width: 12px;
-            height: 12px;
-            stroke: currentColor;
-            fill: none;
-            stroke-width: 2;
-        }
-
-        .modal-search-bar {
-            padding: 12px 20px;
-            background: #18181b;
-            border-bottom: 1px solid #27272a;
-            display: flex;
-            gap: 12px;
+            gap: 16px;
+            margin-bottom: 50px;
             flex-wrap: wrap;
-            align-items: center;
         }
 
-        .modal-search-bar .input-field {
-            flex: 1;
-            min-width: 220px;
-            height: 38px;
-            font-size: 13px;
+        /* Key Metrics Row */
+        .metrics-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            padding: 30px;
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 16px;
+            margin-bottom: 80px;
         }
 
-        .app-filter-tabs {
+        .metric-item {
+            text-align: center;
+        }
+
+        .metric-val {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--cyan-primary);
+            font-family: 'JetBrains Mono', monospace;
+            margin-bottom: 4px;
+        }
+
+        .metric-label {
+            font-size: 0.82rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+
+        /* Section Headings */
+        .section-header {
+            text-align: center;
+            margin-bottom: 48px;
+        }
+
+        .section-tag {
+            color: var(--cyan-primary);
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+
+        .section-title {
+            font-size: 2.2rem;
+            font-weight: 800;
+            letter-spacing: -0.8px;
+            margin-bottom: 12px;
+        }
+
+        .section-subtitle {
+            font-size: 1rem;
+            color: var(--text-muted);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* Installation Tabs Section */
+        .install-section {
+            padding: 60px 0;
+            position: relative;
+        }
+
+        .tab-buttons {
             display: flex;
-            gap: 4px;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 32px;
+            flex-wrap: wrap;
         }
 
-        .filter-btn {
-            background: #27272a;
-            border: none;
-            color: #a1a1aa;
-            border-radius: 4px;
-            padding: 6px 12px;
-            font-size: 12px;
+        .tab-btn {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-muted);
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-size: 0.95rem;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.15s ease;
-        }
-
-        .filter-btn.active {
-            background: #2563eb;
-            color: #ffffff;
-        }
-
-        .apps-grid {
-            padding: 16px 20px;
-            overflow-y: auto;
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
             gap: 10px;
         }
 
-        .app-item {
-            background: #18181b;
-            border: 1px solid #27272a;
+        .tab-btn.active {
+            background: var(--bg-card);
+            border-color: var(--cyan-primary);
+            color: var(--cyan-primary);
+            box-shadow: 0 0 20px rgba(0, 229, 255, 0.15);
+        }
+
+        .tab-content {
+            display: none;
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .step-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        .step-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            padding: 24px;
+            position: relative;
+        }
+
+        .step-num {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            background: rgba(0, 229, 255, 0.15);
+            color: var(--cyan-primary);
+            font-weight: 700;
+            font-size: 0.85rem;
             border-radius: 6px;
-            padding: 10px 12px;
+            margin-bottom: 16px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .step-title {
+            font-size: 1.05rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .step-desc {
+            font-size: 0.88rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        .code-box {
+            background: #020408;
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            padding: 16px 20px;
             display: flex;
             align-items: center;
-            gap: 12px;
-            transition: border-color 0.15s ease;
+            justify-content: space-between;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            color: #38BDF8;
+            margin-top: 20px;
+            overflow-x: auto;
         }
 
-        .app-item:hover {
-            border-color: #3f3f46;
+        .copy-btn {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-muted);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
         }
 
-        .app-item img {
-            width: 44px;
-            height: 44px;
-            border-radius: 10px;
-            object-fit: contain;
-            background: #27272a;
-            padding: 2px;
+        .copy-btn:hover {
+            color: var(--cyan-primary);
+            border-color: var(--cyan-primary);
+        }
+
+        /* QR Showcase Card */
+        .qr-showcase {
+            display: flex;
+            align-items: center;
+            gap: 40px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 14px;
+            padding: 32px;
+        }
+
+        .qr-frame {
+            background: #ffffff;
+            padding: 16px;
+            border-radius: 12px;
+            display: inline-block;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
             flex-shrink: 0;
         }
 
-        .app-item-info {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .app-item-name {
-            font-size: 13px;
-            font-weight: 700;
-            color: #f4f4f5;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .app-item-pkg {
-            font-size: 11px;
-            color: #71717a;
-            font-family: monospace;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            margin-top: 2px;
-        }
-
-        .app-item-version {
-            font-size: 10px;
-            color: #a1a1aa;
-            margin-top: 2px;
-        }
-
-        .empty-state {
-            border: 1px dashed var(--border);
-            border-radius: 4px;
-            padding: 48px 24px;
-            text-align: center;
-            color: var(--text-secondary);
-            font-size: 13px;
-        }
-
-        /* Provisioning Section */
-        .panel-box {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            padding: 24px;
-            max-width: 640px;
-            margin: 0 auto;
-        }
-
-        .panel-title {
-            font-size: 16px;
-            font-weight: 600;
-            margin-bottom: 6px;
-        }
-
-        .panel-desc {
-            font-size: 13px;
-            color: var(--text-secondary);
-            margin-bottom: 20px;
-        }
-
-        .form-group {
+        /* Features Grid */
+        .features-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin-bottom: 16px;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+            margin-bottom: 80px;
         }
 
-        .input-field {
-            width: 100%;
-            padding: 10px 12px;
-            background: var(--bg);
-            border: 1px solid var(--border);
-            color: var(--text-primary);
-            border-radius: 4px;
-            font-size: 13px;
+        .feature-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 14px;
+            padding: 32px 24px;
+            transition: all 0.2s ease;
         }
 
-        .input-field:focus {
-            outline: none;
-            border-color: var(--primary);
+        .feature-card:hover {
+            background: var(--bg-card);
+            border-color: rgba(0, 229, 255, 0.25);
+            transform: translateY(-3px);
         }
 
-        .qr-output-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin: 24px 0;
-        }
-
-        .qr-card {
-            background: #ffffff;
-            padding: 16px;
-            border-radius: 4px;
+        .feature-icon {
+            font-size: 2rem;
+            margin-bottom: 20px;
             display: inline-block;
         }
 
-        .step-list {
-            margin-top: 20px;
-            border-top: 1px solid var(--border);
-            padding-top: 16px;
-            font-size: 13px;
-            color: var(--text-secondary);
+        .feature-title {
+            font-size: 1.15rem;
+            font-weight: 700;
+            margin-bottom: 10px;
         }
 
-        .step-list ol {
-            padding-left: 20px;
-            margin-top: 8px;
+        .feature-desc {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            line-height: 1.6;
         }
 
-        .step-list li {
-            margin-bottom: 6px;
-        }
-
-        footer {
-            border-top: 1px solid var(--border);
-            padding: 20px 24px;
-            font-size: 12px;
-            color: var(--text-tertiary);
+        /* Interactive Phone Screen Preview */
+        .preview-section {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 20px;
+            padding: 48px;
+            margin-bottom: 80px;
             display: flex;
+            align-items: center;
+            gap: 60px;
+        }
+
+        .preview-info {
+            flex: 1;
+        }
+
+        .phone-mockup {
+            width: 300px;
+            height: 560px;
+            background: #020408;
+            border: 8px solid #1E293B;
+            border-radius: 40px;
+            position: relative;
+            box-shadow: 0 25px 60px rgba(0,0,0,0.8), 0 0 40px rgba(0, 229, 255, 0.15);
+            padding: 24px 16px;
+            display: flex;
+            flex-direction: column;
             justify-content: space-between;
-            max-width: 1200px;
-            width: 100%;
-            margin: 0 auto;
+            overflow: hidden;
+            flex-shrink: 0;
         }
 
-        footer a {
-            color: var(--text-secondary);
-            text-decoration: none;
-            margin-left: 16px;
+        .phone-notch {
+            width: 80px;
+            height: 18px;
+            background: #1E293B;
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            border-bottom-left-radius: 12px;
+            border-bottom-right-radius: 12px;
         }
 
-        footer a:hover {
-            color: var(--text-primary);
-            text-decoration: underline;
+        .phone-screen-locked {
+            text-align: center;
+            padding-top: 40px;
+        }
+
+        .lock-icon-anim {
+            font-size: 3rem;
+            margin-bottom: 12px;
+            display: inline-block;
+            animation: bounce 2s infinite ease-in-out;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+
+        /* Pricing Section */
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+            margin-bottom: 80px;
+        }
+
+        .price-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 16px;
+            padding: 36px 28px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .price-card.featured {
+            border-color: var(--cyan-primary);
+            background: linear-gradient(180deg, #10192C 0%, #0B111E 100%);
+            box-shadow: 0 0 30px rgba(0, 229, 255, 0.12);
+        }
+
+        .featured-badge {
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--cyan-primary);
+            color: #060911;
+            font-size: 0.72rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            padding: 4px 12px;
+            border-radius: 999px;
+            letter-spacing: 0.5px;
+        }
+
+        .plan-name {
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .plan-price {
+            font-size: 2.8rem;
+            font-weight: 800;
+            color: var(--text-main);
+            margin-bottom: 8px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .plan-price span {
+            font-size: 1rem;
+            color: var(--text-dim);
+            font-weight: 500;
+        }
+
+        .plan-features {
+            list-style: none;
+            margin: 24px 0 32px;
+        }
+
+        .plan-features li {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .plan-features li::before {
+            content: "✓";
+            color: var(--emerald);
+            font-weight: bold;
+        }
+
+        /* Footer */
+        footer {
+            border-top: 1px solid var(--border-subtle);
+            padding: 48px 0;
+            background: var(--bg-surface);
+            color: var(--text-dim);
+            font-size: 0.88rem;
+        }
+
+        .footer-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        @media (max-width: 900px) {
+            .hero h1 { font-size: 2.4rem; }
+            .metrics-row, .step-grid, .features-grid, .pricing-grid { grid-template-columns: 1fr; }
+            .preview-section { flex-direction: column; text-align: center; }
+            .qr-showcase { flex-direction: column; text-align: center; }
+            .nav-links { display: none; }
         }
     </style>
 </head>
 <body>
 
-    <div class="layout">
-        <header>
-            <div class="header-title">
-                <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                <span>Prithon Tech</span>
-                <span class="system-tag">MDM Fleet Console</span>
-            </div>
-            <div class="connection-indicator">
-                <span class="indicator-dot" id="socket-dot"></span>
-                <span id="socket-status-text">Connected</span>
-            </div>
-        </header>
+    <div class="ambient-glow"></div>
 
-        <!-- Live Metric Summary -->
-        <div class="metric-strip">
-            <div class="metric-card">
-                <div class="metric-label">Active Connected Devices</div>
-                <div class="metric-value" id="metric-total">0</div>
-            </div>
-            <div class="metric-card">
-                <div class="metric-label">Normal Status Devices</div>
-                <div class="metric-value" id="metric-normal">0</div>
-            </div>
-            <div class="metric-card">
-                <div class="metric-label">Restricted / Locked Devices</div>
-                <div class="metric-value" id="metric-locked">0</div>
+    <!-- Navigation -->
+    <nav>
+        <div class="container nav-inner">
+            <a href="/" class="logo">
+                🛡️ PRITHON <span class="logo-badge">MDM SaaS</span>
+            </a>
+            <ul class="nav-links">
+                <li><a href="#how-to-install">How to Install</a></li>
+                <li><a href="#features">Features</a></li>
+                <li><a href="#pricing">Pricing</a></li>
+                <li><a href="/download/app-release.apk">Download APK</a></li>
+            </ul>
+            <div style="display: flex; gap: 12px;">
+                <a href="/download/app-release.apk" class="btn btn-secondary">Direct APK</a>
+                <a href="/dashboard" class="btn btn-primary">Fleet Console →</a>
             </div>
         </div>
+    </nav>
 
-        <!-- Navigation Tabs -->
-        <div class="tab-bar">
-            <button class="tab-button active" onclick="switchTab('tab-fleet')">
-                <svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
-                Fleet Overview
-            </button>
-            <button class="tab-button" onclick="switchTab('tab-provisioning')">
-                <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-                Device Provisioning
-            </button>
-            <button class="tab-button" onclick="switchTab('tab-webhooks')">
-                <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-                Payment Settlement Dispatch
-            </button>
-        </div>
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="container">
+            <div class="pill-tag">
+                <span class="pill-dot"></span>
+                v1.2 Production Ready • Zero-Default Architecture
+            </div>
+            <h1>Zero-Default Hardware Protection<br>for Device Finance & Retail</h1>
+            <p>
+                Turn any smartphone into a sealed, tamper-proof financed asset. Enforce sub-second kiosk locks in under 400ms or trigger instant offline lockdowns via 0-KB Silent SMS without internet.
+            </p>
+            <div class="hero-ctas">
+                <a href="#how-to-install" class="btn btn-primary" style="padding: 14px 28px; font-size: 1rem;">
+                    🚀 10-Second Setup Guide
+                </a>
+                <a href="/download/app-release.apk" class="btn btn-secondary" style="padding: 14px 28px; font-size: 1rem;">
+                    📥 Download Release APK (4.9 MB)
+                </a>
+                <a href="/dashboard" class="btn btn-emerald" style="padding: 14px 28px; font-size: 1rem;">
+                    📊 Open Live Fleet Console
+                </a>
+            </div>
 
-        <!-- TAB 1: FLEET OVERVIEW -->
-        <div id="tab-fleet" class="tab-panel active">
-            <div class="fleet-grid" id="fleet-list">
-                <div class="empty-state" style="grid-column: 1 / -1;">
-                    No active hardware clients connected. Complete device enrollment to monitor telemetry.
+            <!-- Metrics Row -->
+            <div class="metrics-row">
+                <div class="metric-item">
+                    <div class="metric-val">&lt; 400ms</div>
+                    <div class="metric-label">Live WebSocket Lock</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-val">0 KB</div>
+                    <div class="metric-label">Offline SMS Lock</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-val">100%</div>
+                    <div class="metric-label">Anti-Tamper Sealing</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-val">10 Sec</div>
+                    <div class="metric-label">In-Store Onboarding</div>
                 </div>
             </div>
         </div>
+    </section>
 
-        <!-- TAB 2: PROVISIONING -->
-        <div id="tab-provisioning" class="tab-panel">
-            <div class="panel-box">
-                <div class="panel-title">Android Enterprise Enrollment Payload</div>
-                <div class="panel-desc">
-                    Configure local wireless parameters. The QR code generates an authenticated enrollment bundle containing the package location, cryptographic checksum, and Device Owner directives.
-                </div>
+    <!-- How to Install Section (Key Friction Fix) -->
+    <section class="install-section" id="how-to-install">
+        <div class="container">
+            <div class="section-header">
+                <div class="section-tag">Retailer &amp; Technician Playbook</div>
+                <h2 class="section-title">How To Install &amp; Provision In 10 Seconds</h2>
+                <p class="section-subtitle">
+                    Designed for mobile retail stores and financiers. Select your preferred deployment method below:
+                </p>
+            </div>
 
-                <div class="form-group">
-                    <input type="text" id="wifi-ssid" class="input-field" placeholder="Wi-Fi SSID (Optional)" value="">
-                    <input type="password" id="wifi-pass" class="input-field" placeholder="Wi-Fi Password (Optional)" value="">
-                </div>
-
-                <button class="btn btn-primary" onclick="generateEnrollmentQr()">
-                    Generate Provisioning Code
+            <!-- Tab Buttons -->
+            <div class="tab-buttons">
+                <button class="tab-btn active" onclick="switchTab('tab-usb')">
+                    🔌 Method 1: 1-Click USB Retail Tool (Recommended)
                 </button>
-
-                <div class="qr-output-container">
-                    <div class="qr-card" id="qr-target"></div>
-                </div>
-
-                <div class="step-list">
-                    <strong>Enrollment Instructions:</strong>
-                    <ol>
-                        <li>Power on unboxed or factory-reset hardware to the standard setup welcome view.</li>
-                        <li>Tap repeatedly on blank screen space six times to initialize the internal vision scanner.</li>
-                        <li>Align camera with this barcode. The device downloads the agent, validates the SHA-256 integrity hash, and establishes Device Owner status.</li>
-                    </ol>
-                </div>
-            </div>
-        </div>
-
-        <!-- TAB 3: PAYMENT SETTLEMENT DISPATCH -->
-        <div id="tab-webhooks" class="tab-panel">
-            <div class="panel-box">
-                <div class="panel-title">Automated Payment Settlement Webhook</div>
-                <div class="panel-desc">
-                    Simulate incoming payment verification from authorized payment gateway partners (e.g., Razorpay, Cashfree, BBPS). Upon confirmation, the backend transmits an immediate unlock instruction.
-                </div>
-
-                <div style="margin-bottom: 16px;">
-                    <input type="text" id="sim-id" class="input-field" placeholder="Target Device ID">
-                </div>
-
-                <button class="btn btn-success" onclick="dispatchPaymentWebhook()">
-                    <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-                    Dispatch Settlement Unlock Verification
+                <button class="tab-btn" onclick="switchTab('tab-qr')">
+                    📷 Method 2: Day-0 Fresh Phone 6-Tap QR
+                </button>
+                <button class="tab-btn" onclick="switchTab('tab-ota')">
+                    📲 Method 3: Direct Phone Browser Download
                 </button>
             </div>
-        </div>
-    </div>
 
-    <!-- Installed Apps Modal -->
-    <div id="apps-modal" class="modal-backdrop" style="display: none;" onclick="handleModalBackdropClick(event)">
-        <div class="modal-container" onclick="event.stopPropagation()">
-            <div class="modal-header">
+            <!-- Tab 1: USB 1-Click Provisioning -->
+            <div id="tab-usb" class="tab-content active">
+                <div class="step-grid">
+                    <div class="step-card">
+                        <div class="step-num">01</div>
+                        <h3 class="step-title">Connect Phone to PC</h3>
+                        <p class="step-desc">
+                            Connect the customer's phone via USB cable. Enable <b>USB Debugging</b> in Developer Options (Settings &gt; About Phone &gt; Tap Build Number 7 times).
+                        </p>
+                    </div>
+                    <div class="step-card">
+                        <div class="step-num">02</div>
+                        <h3 class="step-title">Run 1-Click Installer</h3>
+                        <p class="step-desc">
+                            Download and double-click our automated setup tool. It installs the release APK and provisions Device Owner silently in 5 seconds.
+                        </p>
+                        <div style="margin-top: 14px; display: flex; gap: 8px;">
+                            <a href="/setup.bat" download class="btn btn-primary" style="font-size: 0.8rem; padding: 6px 12px;">Download for Windows (.bat)</a>
+                            <a href="/setup.sh" download class="btn btn-secondary" style="font-size: 0.8rem; padding: 6px 12px;">Mac / Linux (.sh)</a>
+                        </div>
+                    </div>
+                    <div class="step-card">
+                        <div class="step-num">03</div>
+                        <h3 class="step-title">Enter Customer EMI</h3>
+                        <p class="step-desc">
+                            Open the app on the phone, enter Customer Name, Phone Number, and EMI Amount. The phone instantly binds to your cloud fleet!
+                        </p>
+                    </div>
+                </div>
+
+                <div class="code-box">
+                    <span>💻 Quick Terminal Command: curl -sSL https://prithon-mdm-backend.onrender.com/setup.sh | bash</span>
+                    <button class="copy-btn" onclick="copyToClipboard('curl -sSL https://prithon-mdm-backend.onrender.com/setup.sh | bash')">Copy Command</button>
+                </div>
+            </div>
+
+            <!-- Tab 2: 6-Tap QR Provisioning -->
+            <div id="tab-qr" class="tab-content">
+                <div class="qr-showcase">
+                    <div class="qr-frame">
+                        <div id="landing-qr"></div>
+                    </div>
+                    <div>
+                        <h3 style="font-size: 1.4rem; font-weight: 700; margin-bottom: 12px;">Brand New Sealed Phone Setup (Day-0)</h3>
+                        <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 16px;">
+                            For unboxed or factory-reset devices before customer delivery:
+                        </p>
+                        <ol style="color: var(--text-muted); font-size: 0.9rem; padding-left: 20px; line-height: 1.8;">
+                            <li>Power on the factory-reset device to the Welcome screen.</li>
+                            <li>Tap the blank space <b>6 times</b> to launch the built-in enterprise QR scanner.</li>
+                            <li>Scan this QR code. The device downloads <code>app-release.apk</code> and self-provisions.</li>
+                            <li>Tap <b>"FINISH &amp; CONTINUE"</b> to enter the home screen with full hardware guard active.</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 3: Direct APK Download -->
+            <div id="tab-ota" class="tab-content">
+                <div class="qr-showcase">
+                    <div class="qr-frame">
+                        <div id="apk-download-qr"></div>
+                    </div>
+                    <div>
+                        <h3 style="font-size: 1.4rem; font-weight: 700; margin-bottom: 12px;">Direct Device Download</h3>
+                        <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 16px;">
+                            Scan this QR code with the customer's phone camera to download the APK directly, or click the download button below:
+                        </p>
+                        <div style="display: flex; gap: 12px; align-items: center;">
+                            <a href="/download/app-release.apk" class="btn btn-primary">Download app-release.apk (4.9 MB)</a>
+                            <span style="font-size: 0.85rem; color: var(--text-dim);">SHA-256 Verified Release</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- Live Kiosk Mockup Preview -->
+    <section class="container" style="padding: 40px 0;">
+        <div class="preview-section">
+            <div class="preview-info">
+                <div class="section-tag">Interactive Threat Defense</div>
+                <h2 style="font-size: 2.2rem; font-weight: 800; margin-bottom: 16px;">When an EMI is Overdue: Instant Lockdown</h2>
+                <p style="color: var(--text-muted); font-size: 1rem; line-height: 1.7; margin-bottom: 24px;">
+                    The moment a customer misses payment, trigger an instant kiosk lockdown with 1-click from your dashboard. Even if the customer removes Wi-Fi or turns off 5G data, our <b>0-KB Silent SMS Engine</b> penetrates the phone and locks it remotely.
+                </p>
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <div style="display: flex; align-items: center; gap: 10px; color: var(--emerald); font-weight: 600;">
+                        <span>✓</span> Blocks all user apps (WhatsApp, YouTube, Settings, Phone Dialers)
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px; color: var(--emerald); font-weight: 600;">
+                        <span>✓</span> Displays UPI Payment QR code &amp; Financier Support Contact
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px; color: var(--emerald); font-weight: 600;">
+                        <span>✓</span> Always keeps 112 Police/Emergency dialer functional (100% Legal)
+                    </div>
+                </div>
+            </div>
+
+            <!-- Phone Screen Simulation -->
+            <div class="phone-mockup">
+                <div class="phone-notch"></div>
+                <div class="phone-screen-locked">
+                    <div class="lock-icon-anim">🔒</div>
+                    <h4 style="color: var(--red-alert); font-size: 1.1rem; font-weight: 800; letter-spacing: 1px; margin-bottom: 6px;">DEVICE LOCKED</h4>
+                    <p style="color: var(--text-muted); font-size: 0.72rem; line-height: 1.4; padding: 0 10px; margin-bottom: 16px;">
+                        Monthly EMI Overdue. Scan QR to pay and unlock immediately.
+                    </p>
+                    <div style="background: white; padding: 10px; border-radius: 8px; width: 110px; height: 110px; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center;">
+                        <span style="font-size: 0.65rem; color: black; font-weight: bold;">[ UPI PAYMENT QR ]</span>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.06); padding: 8px 12px; border-radius: 6px; font-size: 0.75rem; color: #E2E8F0; margin-bottom: 12px;">
+                        Loan ID: PRT-2026-981<br>
+                        EMI: ₹1,850 Due
+                    </div>
+                </div>
+                <div style="display: flex; gap: 6px;">
+                    <button style="flex: 1; padding: 8px; background: rgba(239, 68, 68, 0.2); border: 1px solid var(--red-alert); color: var(--red-alert); font-size: 0.68rem; font-weight: bold; border-radius: 6px;">EMERGENCY 112</button>
+                    <button style="flex: 1; padding: 8px; background: rgba(0, 229, 255, 0.2); border: 1px solid var(--cyan-primary); color: var(--cyan-primary); font-size: 0.68rem; font-weight: bold; border-radius: 6px;">CALL SUPPORT</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SaaS Features Grid -->
+    <section class="container" id="features" style="padding: 40px 0 60px;">
+        <div class="section-header">
+            <div class="section-tag">Industrial Architecture</div>
+            <h2 class="section-title">Built Specifically for Finance Companies</h2>
+            <p class="section-subtitle">
+                Everything required to protect loan capital, ensure 100% on-time EMI recovery, and prevent device theft.
+            </p>
+        </div>
+
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <h3 class="feature-title">Sub-Second Live Lock</h3>
+                <p class="feature-desc">
+                    Persistent bidirectional WebSocket hub synchronizes with your device fleet in under 400 milliseconds. Lock or unlock instantly with 1-click.
+                </p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📶</div>
+                <h3 class="feature-title">0-KB Silent SMS Trigger</h3>
+                <p class="feature-desc">
+                    Customer turned off mobile data or exhausted balance? Send an encrypted SMS trigger. The device parses it silently in background and seals the phone without internet!
+                </p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🛡️</div>
+                <h3 class="feature-title">Anti-Tamper Hardware Guard</h3>
+                <p class="feature-desc">
+                    Device Owner policies block USB data transfers, prohibit Safe Mode reboot, disallow Developer Options, and prevent Factory Reset from Settings.
+                </p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📱</div>
+                <h3 class="feature-title">Real-Time App Inventory</h3>
+                <p class="feature-desc">
+                    Extract live package names, app titles, and base64 app icons. Know exactly what apps are installed on the financed device without violating user privacy.
+                </p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📊</div>
+                <h3 class="feature-title">Customer &amp; Loan Ledger</h3>
+                <p class="feature-desc">
+                    Bind customer name, phone number, loan ID, monthly EMI, and due dates directly to the phone hardware ID (ANDROID_ID).
+                </p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">⚖️</div>
+                <h3 class="feature-title">100% Regulatory Compliant</h3>
+                <p class="feature-desc">
+                    Follows all TRAI and Indian telecom guidelines: never blocks emergency dialing (112), and provides transparent financier helpline options.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pricing Section -->
+    <section class="container" id="pricing" style="padding: 40px 0 80px;">
+        <div class="section-header">
+            <div class="section-tag">Monetization &amp; Licensing</div>
+            <h2 class="section-title">Transparent Per-Device SaaS Pricing</h2>
+            <p class="section-subtitle">
+                Pay only for the devices you finance. No hidden fees or recurring monthly server overhead.
+            </p>
+        </div>
+
+        <div class="pricing-grid">
+            <div class="price-card">
                 <div>
-                    <div class="modal-title" id="modal-device-title">Installed Applications</div>
-                    <div class="modal-subtitle" id="modal-device-subtitle">Device ID: -</div>
+                    <div class="plan-name">Single Retailer</div>
+                    <div class="plan-price">₹199 <span>/ device</span></div>
+                    <p style="color: var(--text-muted); font-size: 0.85rem;">Lifetime license for 1 device loan period</p>
+                    <ul class="plan-features">
+                        <li>Sub-second live lock/unlock</li>
+                        <li>0-KB Silent SMS Trigger</li>
+                        <li>Hardware USB &amp; Safe Mode Sealing</li>
+                        <li>Live Battery &amp; Network Status</li>
+                        <li>Web Dashboard Access</li>
+                    </ul>
                 </div>
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <button class="btn-refresh-apps" id="btn-refresh-apps" onclick="requestAppRefresh()">
-                        <svg viewBox="0 0 24 24"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-                        <span id="refresh-btn-text">Refresh from Device</span>
-                    </button>
-                    <button class="btn-close-modal" onclick="closeAppsModal()">&times;</button>
-                </div>
+                <a href="/dashboard" class="btn btn-secondary" style="width: 100%;">Start Free Trial (3 Devices)</a>
             </div>
-            <div class="modal-search-bar">
-                <input type="text" id="app-search-input" class="input-field" placeholder="Search app name or package name..." oninput="filterApps()">
-                <div class="app-filter-tabs">
-                    <button class="filter-btn active" id="filter-all" onclick="setAppFilter('all')">All (<span id="count-all">0</span>)</button>
-                    <button class="filter-btn" id="filter-user" onclick="setAppFilter('user')">User Apps (<span id="count-user">0</span>)</button>
-                    <button class="filter-btn" id="filter-system" onclick="setAppFilter('system')">System Apps (<span id="count-system">0</span>)</button>
+
+            <div class="price-card featured">
+                <div class="featured-badge">MOST POPULAR</div>
+                <div>
+                    <div class="plan-name">Fleet Pro (Stores)</div>
+                    <div class="plan-price">₹149 <span>/ device</span></div>
+                    <p style="color: var(--text-muted); font-size: 0.85rem;">For stores financing 25+ devices / month</p>
+                    <ul class="plan-features">
+                        <li>All Single Retailer features</li>
+                        <li>Custom Store Branding on Lock Screen</li>
+                        <li>Direct UPI QR Code Customization</li>
+                        <li>App Inventory &amp; Diagnostics</li>
+                        <li>Priority WebSocket Cloud Server</li>
+                        <li>Bulk CSV Device Import</li>
+                    </ul>
                 </div>
+                <a href="/dashboard" class="btn btn-primary" style="width: 100%;">Activate Fleet Pro</a>
             </div>
-            <div class="apps-grid" id="apps-grid-content">
-                <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #71717a;">
-                    Loading installed applications...
+
+            <div class="price-card">
+                <div>
+                    <div class="plan-name">Enterprise NBFC</div>
+                    <div class="plan-price">Custom</div>
+                    <p style="color: var(--text-muted); font-size: 0.85rem;">For high-volume loan companies &amp; banks</p>
+                    <ul class="plan-features">
+                        <li>REST API &amp; Webhook Integration</li>
+                        <li>Sync with Loan Management Software (LMS)</li>
+                        <li>White-label custom APK with your logo</li>
+                        <li>Dedicated Private Cloud Instance</li>
+                        <li>Automated Automated EMI Due Lock</li>
+                        <li>24/7 Dedicated Support</li>
+                    </ul>
                 </div>
+                <a href="mailto:sales@prithon.com" class="btn btn-secondary" style="width: 100%;">Contact Enterprise Sales</a>
             </div>
         </div>
-    </div>
+    </section>
 
+    <!-- Footer -->
     <footer>
-        <div>Prithon Tech Private Limited. Production Device Management Platform.</div>
-        <div>
-            <a href="/privacy">Privacy Policy</a>
-            <a href="/terms">Terms of Service</a>
+        <div class="container footer-inner">
+            <div>
+                <span style="font-weight: 700; color: var(--text-main);">PRITHON TECH</span> • Enterprise MDM &amp; Device Finance Cloud
+            </div>
+            <div style="display: flex; gap: 20px;">
+                <a href="/dashboard" style="color: var(--cyan-primary); text-decoration: none;">Fleet Console</a>
+                <a href="/download/app-release.apk" style="color: var(--text-muted); text-decoration: none;">Download APK</a>
+                <a href="/setup.bat" style="color: var(--text-muted); text-decoration: none;">Windows Setup (.bat)</a>
+                <a href="/setup.sh" style="color: var(--text-muted); text-decoration: none;">Mac/Linux Setup (.sh)</a>
+            </div>
         </div>
     </footer>
 
+    <!-- Interactive Scripts -->
     <script>
-        const socket = io();
-        let registeredDevices = {};
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
 
-        function switchTab(targetId) {
-            document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-            document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
-            document.getElementById(targetId).classList.add('active');
             event.currentTarget.classList.add('active');
+            document.getElementById(tabId).classList.add('active');
         }
 
-        socket.on('connect', () => {
-            document.getElementById('socket-dot').classList.remove('offline');
-            document.getElementById('socket-status-text').innerText = 'Connected';
-        });
-
-        socket.on('disconnect', () => {
-            document.getElementById('socket-dot').classList.add('offline');
-            document.getElementById('socket-status-text').innerText = 'Offline';
-        });
-
-        socket.on('device_list_updated', (devices) => {
-            renderDeviceList(devices);
-            if (activeModalDeviceId && devices[activeModalDeviceId] && devices[activeModalDeviceId].apps) {
-                currentAppsList = devices[activeModalDeviceId].apps;
-                renderAppsGrid();
-            }
-        });
-
-        function renderDeviceList(devices) {
-            registeredDevices = devices;
-            const container = document.getElementById('fleet-list');
-            const keys = Object.keys(devices);
-
-            let normalCount = 0;
-            let lockedCount = 0;
-
-            keys.forEach(k => {
-                if (devices[k].status === 'LOCKED') lockedCount++;
-                else normalCount++;
-            });
-
-            document.getElementById('metric-total').innerText = keys.length;
-            document.getElementById('metric-normal').innerText = normalCount;
-            document.getElementById('metric-locked').innerText = lockedCount;
-
-            if (keys.length === 0) {
-                container.innerHTML = `
-                    <div class="empty-state" style="grid-column: 1 / -1;">
-                        No active hardware clients connected. Complete device enrollment to monitor telemetry.
-                    </div>`;
-                return;
-            }
-
-            container.innerHTML = '';
-            keys.forEach(id => {
-                const dev = devices[id];
-                const isLocked = dev.status === 'LOCKED';
-                const isOnline = dev.online !== false;
-
-                const card = document.createElement('div');
-                card.className = 'device-card';
-                card.innerHTML = `
-                    <div class="device-card-header">
-                        <div>
-                            <div class="device-title">${escapeHtml(dev.brand)} ${escapeHtml(dev.model)}</div>
-                            <div class="device-id">${escapeHtml(id)}</div>
-                        </div>
-                        <div style="display: flex; gap: 6px; align-items: center;">
-                            <span class="badge ${isOnline ? 'badge-normal' : ''}" style="${!isOnline ? 'background: rgba(113, 113, 122, 0.2); color: #a1a1aa; border: 1px solid rgba(113, 113, 122, 0.4);' : ''}">
-                                ${isOnline ? 'ONLINE' : 'OFFLINE'}
-                            </span>
-                            <span class="badge ${isLocked ? 'badge-locked' : 'badge-normal'}">
-                                ${isLocked ? 'LOCKED' : 'NORMAL'}
-                            </span>
-                        </div>
-                    </div>
-
-                    ${dev.customerName ? `
-                        <div style="background: rgba(37, 99, 235, 0.12); border: 1px solid rgba(37, 99, 235, 0.3); border-radius: 6px; padding: 10px 14px; margin: 12px 0;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                                <span style="font-size: 14px; font-weight: 700; color: #fff;">👤 ${escapeHtml(dev.customerName)}</span>
-                                <span style="font-size: 12px; color: #60a5fa; font-weight: 600;">📞 ${escapeHtml(dev.customerPhone || 'N/A')}</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; font-size: 12px; color: #94a3b8; margin-top: 4px;">
-                                <span>Loan: <strong style="color: #cbd5e1;">${escapeHtml(dev.loanId || 'N/A')}</strong></span>
-                                <span>EMI: <strong style="color: #38bdf8;">₹${escapeHtml(dev.emiAmount || '0')}</strong></span>
-                            </div>
-                        </div>
-
-                        <!-- 0-KB Silent SMS Trigger helper -->
-                        <div style="background: rgba(245, 158, 11, 0.06); border: 1px solid rgba(245, 158, 11, 0.2); border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; font-size: 11px; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-                            <div style="min-width: 0;">
-                                <div style="color: #fbbf24; font-weight: 700; display: flex; align-items: center; gap: 6px;">
-                                    <span>📡 Offline SMS Trigger (0-KB Internet)</span>
-                                </div>
-                                <div style="color: #cbd5e1; font-family: monospace; font-size: 11px; margin-top: 3px;">
-                                    Lock: <span style="color: #f87171;">#PRITHON:LOCK:${escapeHtml(dev.loanId || 'ADMIN')}#</span>
-                                </div>
-                            </div>
-                            ${dev.customerPhone ? `
-                                <a href="sms:${escapeHtml(dev.customerPhone)}?body=%23PRITHON%3ALOCK%3A${encodeURIComponent(dev.loanId || 'ADMIN')}%23" style="background: #27272a; border: 1px solid #3f3f46; color: #f4f4f5; text-decoration: none; padding: 5px 9px; border-radius: 4px; font-size: 11px; font-weight: 600; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;" title="Send SMS from default messaging app">
-                                    Send SMS
-                                </a>
-                            ` : ''}
-                        </div>
-                    ` : `
-                        <div style="background: rgba(148, 163, 184, 0.05); border: 1px dashed rgba(148, 163, 184, 0.2); border-radius: 6px; padding: 10px 12px; margin: 12px 0; font-size: 12px; color: #94a3b8; display: flex; justify-content: space-between; align-items: center;">
-                            <span>Customer: <em>Fill Form on Phone or Assign</em></span>
-                            <button onclick="promptCustomerDetails('${id}')" style="background: #2563eb; color: #fff; border: none; border-radius: 4px; padding: 4px 10px; font-size: 11px; cursor: pointer; font-weight: 600;">Assign</button>
-                        </div>
-                    `}
-
-                    <!-- Quick Action Buttons Directly Below Device Name -->
-                    <div class="device-actions-row">
-                        <button class="btn-action btn-lock ${isLocked ? 'muted' : ''}" onclick="issueCommand('${id}', 'LOCK')">
-                            <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                            ${isLocked ? 'Locked (Re-lock)' : 'Lock Device'}
-                        </button>
-                        <button class="btn-action btn-unlock ${!isLocked ? 'muted' : ''}" onclick="issueCommand('${id}', 'UNLOCK')">
-                            <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
-                            ${!isLocked ? 'Unlocked (Active)' : 'Unlock Device'}
-                        </button>
-                    </div>
-
-                    <div class="data-table">
-                        <div class="data-row">
-                            <span>Battery Status</span>
-                            <span>${dev.battery}%</span>
-                        </div>
-                        <div class="data-row">
-                            <span>OS Version</span>
-                            <span>Android ${escapeHtml(dev.androidVersion)}</span>
-                        </div>
-                        <div class="data-row">
-                            <span>Device Owner</span>
-                            <span>${dev.isDeviceOwner ? 'Enforced' : 'Unverified'}</span>
-                        </div>
-                        <div class="data-row">
-                            <span>Last Synchronization</span>
-                            <span>${escapeHtml(dev.lastSeen)}</span>
-                        </div>
-                    </div>
-
-                    <div style="margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border);">
-                        <button class="btn" style="width: 100%; background: #18181b; color: #f4f4f5; border: 1px solid #27272a; border-radius: 6px; padding: 9px 12px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.15s ease;" onmouseover="this.style.borderColor='#3b82f6'; this.style.background='#222228';" onmouseout="this.style.borderColor='#27272a'; this.style.background='#18181b';" onclick="openAppsModal('${id}', '${escapeHtml(dev.brand)} ${escapeHtml(dev.model)}')">
-                            <svg style="width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2;" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-                            <span>View Installed Applications</span>
-                            <span style="background: rgba(37, 99, 235, 0.2); color: #60a5fa; padding: 2px 8px; border-radius: 12px; font-size: 11px; margin-left: 4px;">${dev.apps ? dev.apps.length : 'View'}</span>
-                        </button>
-                    </div>
-                `;
-                container.appendChild(card);
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                alert('Command copied to clipboard!');
             });
         }
 
-        // Fetch initial list via REST API on page load
-        fetch('/api/devices')
-            .then(res => res.json())
-            .then(devices => renderDeviceList(devices))
-            .catch(() => {});
-
-        async function issueCommand(deviceId, command) {
-            try {
-                const response = await fetch(`/api/devices/${encodeURIComponent(deviceId)}/command`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ command })
-                });
-                const res = await response.json();
-                if (!response.ok) alert(res.error || 'Command dispatch failed');
-            } catch (err) {
-                alert('Network error communicating with control plane: ' + err.message);
-            }
-        }
-
-        async function promptCustomerDetails(deviceId) {
-            const current = registeredDevices[deviceId] || {};
-            const customerName = prompt('Enter Customer Full Name:', current.customerName || '');
-            if (customerName === null) return;
-            const customerPhone = prompt('Enter Customer Mobile Number:', current.customerPhone || '');
-            if (customerPhone === null) return;
-            const loanId = prompt('Enter Loan / Account ID:', current.loanId || '');
-            if (loanId === null) return;
-            const emiAmount = prompt('Enter Monthly EMI Amount (INR):', current.emiAmount || '');
-            if (emiAmount === null) return;
-
-            try {
-                await fetch(`/api/devices/${encodeURIComponent(deviceId)}/customer`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ customerName, customerPhone, loanId, emiAmount })
-                });
-            } catch (err) {
-                alert('Failed to update customer: ' + err.message);
-            }
-        }
-
-        async function dispatchPaymentWebhook() {
-            const deviceId = document.getElementById('sim-id').value.trim();
-            if (!deviceId) return alert('Enter a valid device identifier.');
-
-            try {
-                const response = await fetch('/api/webhook/payment-received', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ deviceId, status: 'SUCCESS' })
-                });
-                const res = await response.json();
-                if (res.success) {
-                    alert('Settlement verified. Unlock instruction issued.');
-                } else {
-                    alert('Webhook processed. Target device state updated.');
-                }
-            } catch (err) {
-                alert('Webhook dispatch failed: ' + err.message);
-            }
-        }
-
-        async function generateEnrollmentQr() {
-            const ssid = document.getElementById('wifi-ssid').value.trim();
-            const pass = document.getElementById('wifi-pass').value.trim();
+        // Render Dynamic QR Codes on Page Load
+        window.addEventListener('DOMContentLoaded', async () => {
             const host = window.location.origin;
 
-            const response = await fetch(`/api/provisioning-payload?ssid=${encodeURIComponent(ssid)}&password=${encodeURIComponent(pass)}&host=${encodeURIComponent(host)}`);
-            const data = await response.json();
+            // 1. Enrollment QR (Day-0)
+            try {
+                const res = await fetch(`/api/provisioning-payload?host=${encodeURIComponent(host)}`);
+                const data = await res.json();
+                new QRCode(document.getElementById('landing-qr'), {
+                    text: JSON.stringify(data.payload),
+                    width: 180,
+                    height: 180,
+                    correctLevel: QRCode.CorrectLevel.M
+                });
+            } catch (e) {
+                console.error("Failed to load provisioning payload", e);
+            }
 
-            const target = document.getElementById('qr-target');
-            target.innerHTML = '';
-            new QRCode(target, {
-                text: JSON.stringify(data.payload),
-                width: 240,
-                height: 240,
+            // 2. Direct APK Download QR
+            new QRCode(document.getElementById('apk-download-qr'), {
+                text: `${host}/download/app-release.apk`,
+                width: 180,
+                height: 180,
                 correctLevel: QRCode.CorrectLevel.M
             });
-        }
-
-        function escapeHtml(str) {
-            if (!str) return '';
-            return String(str)
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#039;');
-        }
-
-        // Modal and App Inventory Controller
-        let activeModalDeviceId = null;
-        let currentAppsList = [];
-        let currentAppFilter = 'all';
-
-        async function openAppsModal(deviceId, deviceTitle) {
-            activeModalDeviceId = deviceId;
-            document.getElementById('modal-device-title').innerText = `Installed Applications - ${deviceTitle || 'Device'}`;
-            document.getElementById('modal-device-subtitle').innerText = `Device ID: ${deviceId}`;
-            document.getElementById('apps-modal').style.display = 'flex';
-            document.getElementById('app-search-input').value = '';
-            currentAppFilter = 'all';
-            updateFilterTabsUI();
-
-            const dev = registeredDevices[deviceId];
-            if (dev && dev.apps && dev.apps.length > 0) {
-                currentAppsList = dev.apps;
-                renderAppsGrid();
-            } else {
-                await fetchAppsForDevice(deviceId);
-            }
-        }
-
-        async function fetchAppsForDevice(deviceId) {
-            const grid = document.getElementById('apps-grid-content');
-            grid.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #71717a;">Loading applications from device...</div>';
-
-            try {
-                const res = await fetch(`/api/devices/${encodeURIComponent(deviceId)}/apps`);
-                const data = await res.json();
-                if (data.success && data.apps && data.apps.length > 0) {
-                    currentAppsList = data.apps;
-                    if (registeredDevices[deviceId]) {
-                        registeredDevices[deviceId].apps = data.apps;
-                    }
-                    renderAppsGrid();
-                } else {
-                    grid.innerHTML = `
-                        <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #a1a1aa;">
-                            <p style="margin-bottom: 12px; font-size: 13px;">No applications cached yet for this device.</p>
-                            <button class="btn btn-primary" onclick="requestAppRefresh()" style="display: inline-flex; width: auto; font-size: 12px; padding: 8px 16px;">
-                                Request Apps from Device Now
-                            </button>
-                        </div>`;
-                }
-            } catch (err) {
-                grid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #ef4444;">Failed to load apps: ${escapeHtml(err.message)}</div>`;
-            }
-        }
-
-        async function requestAppRefresh() {
-            if (!activeModalDeviceId) return;
-            const btnText = document.getElementById('refresh-btn-text');
-            const originalText = btnText.innerText;
-            btnText.innerText = 'Requesting...';
-
-            try {
-                await fetch(`/api/devices/${encodeURIComponent(activeModalDeviceId)}/command`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ command: 'GET_APPS' })
-                });
-                btnText.innerText = 'Sent! Waiting sync...';
-                setTimeout(() => {
-                    btnText.innerText = originalText;
-                }, 3000);
-            } catch (err) {
-                alert('Failed to send refresh command: ' + err.message);
-                btnText.innerText = originalText;
-            }
-        }
-
-        function closeAppsModal() {
-            document.getElementById('apps-modal').style.display = 'none';
-            activeModalDeviceId = null;
-        }
-
-        function handleModalBackdropClick(event) {
-            if (event.target.id === 'apps-modal') {
-                closeAppsModal();
-            }
-        }
-
-        function setAppFilter(filter) {
-            currentAppFilter = filter;
-            updateFilterTabsUI();
-            renderAppsGrid();
-        }
-
-        function updateFilterTabsUI() {
-            ['all', 'user', 'system'].forEach(f => {
-                const btn = document.getElementById(`filter-${f}`);
-                if (btn) {
-                    if (f === currentAppFilter) btn.classList.add('active');
-                    else btn.classList.remove('active');
-                }
-            });
-        }
-
-        function filterApps() {
-            renderAppsGrid();
-        }
-
-        function renderAppsGrid() {
-            const query = (document.getElementById('app-search-input').value || '').trim().toLowerCase();
-            const grid = document.getElementById('apps-grid-content');
-
-            let userCount = 0;
-            let systemCount = 0;
-            currentAppsList.forEach(app => {
-                if (app.isSystem) systemCount++;
-                else userCount++;
-            });
-
-            document.getElementById('count-all').innerText = currentAppsList.length;
-            document.getElementById('count-user').innerText = userCount;
-            document.getElementById('count-system').innerText = systemCount;
-
-            const filtered = currentAppsList.filter(app => {
-                // Filter tab check
-                if (currentAppFilter === 'user' && app.isSystem) return false;
-                if (currentAppFilter === 'system' && !app.isSystem) return false;
-
-                // Search query check
-                if (query) {
-                    const matchName = (app.name || '').toLowerCase().includes(query);
-                    const matchPkg = (app.packageName || '').toLowerCase().includes(query);
-                    return matchName || matchPkg;
-                }
-                return true;
-            });
-
-            if (filtered.length === 0) {
-                grid.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #71717a;">No applications match your filter.</div>';
-                return;
-            }
-
-            grid.innerHTML = filtered.map(app => `
-                <div class="app-item">
-                    ${app.icon ? `<img src="${app.icon}" alt="${escapeHtml(app.name)}" onerror="this.style.display='none'">` : `<div style="width: 44px; height: 44px; border-radius: 10px; background: #27272a; display: flex; align-items: center; justify-content: center; font-size: 18px;">📱</div>`}
-                    <div class="app-item-info">
-                        <div class="app-item-name" title="${escapeHtml(app.name)}">${escapeHtml(app.name)}</div>
-                        <div class="app-item-pkg" title="${escapeHtml(app.packageName)}">${escapeHtml(app.packageName)}</div>
-                        <div class="app-item-version">
-                            <span>v${escapeHtml(app.version || '1.0')}</span>
-                            ${app.isSystem ? '<span style="margin-left: 6px; padding: 1px 5px; background: #27272a; color: #a1a1aa; border-radius: 3px; font-size: 9px; font-weight: 600;">SYSTEM</span>' : '<span style="margin-left: 6px; padding: 1px 5px; background: rgba(37, 99, 235, 0.2); color: #60a5fa; border-radius: 3px; font-size: 9px; font-weight: 600;">USER</span>'}
-                        </div>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        // Initialize QR on load
-        generateEnrollmentQr();
+        });
     </script>
 </body>
 </html>
