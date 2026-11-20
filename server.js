@@ -17,6 +17,12 @@ const apkDir = path.join(__dirname, 'apk');
 if (!fs.existsSync(apkDir)) {
     fs.mkdirSync(apkDir, { recursive: true });
 }
+app.get('/download/app-debug.apk', (req, res, next) => {
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    const ua = req.headers['user-agent'] || 'Unknown';
+    console.log(`[PROVISIONING DOWNLOAD] Device at IP ${ip} downloading app-debug.apk (UA: ${ua})`);
+    next();
+});
 app.use('/download', express.static(apkDir));
 
 const server = http.createServer(app);
@@ -76,9 +82,13 @@ function getApkChecksum() {
 
 // Helper: Get URL-safe Base64 SHA-256 of the signing certificate (Google TestDPC standard)
 function getApkSignatureChecksum() {
-    // Constant debug certificate SHA-256 hex: 6289a3576223fa8642ba4dfa704020a616b5d68edf3cea243465eef322d9fa18
+    // SHA-256 fingerprint of Android debug signing key:
+    // 62:89:A3:57:62:23:FA:86:42:BA:4D:FA:70:40:20:A6:16:B5:D6:8E:DF:3C:EA:24:34:65:EE:F3:22:D9:FA:18
     const certHex = '6289a3576223fa8642ba4dfa704020a616b5d68edf3cea243465eef322d9fa18';
-    return Buffer.from(certHex, 'hex').toString('base64url');
+    return Buffer.from(certHex, 'hex')
+        .toString('base64')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_'); // Retains '=' padding (44 chars) matching Google TestDPC reference
 }
 
 // 1. Android Enterprise 6-Tap QR Provisioning Endpoint
@@ -89,22 +99,15 @@ app.get('/api/provisioning-payload', (req, res) => {
     const activeHost = host || reqHost || `${SERVER_HOST}:${PORT}`;
     const baseOrigin = activeHost.startsWith('http') ? activeHost : `${proto}://${activeHost}`;
     
-    // Direct Render Cloud Download URL (Direct 200 OK without multi-hop 302 redirects)
+    // Direct Download URL for Device Policy Controller APK
     const downloadLocation = `${baseOrigin}/download/app-debug.apk`;
-    const checksum = getApkChecksum();
     const signatureChecksum = getApkSignatureChecksum();
 
+    // Clean Google TestDPC-standard 3-Key Payload
     const payload = {
         "android.app.extra.PROVISIONING_DEVICE_ADMIN_COMPONENT_NAME": "com.prithon.dpc/com.prithon.dpc.receivers.PrithonAdminReceiver",
-        "android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_DOWNLOAD_LOCATION": downloadLocation,
         "android.app.extra.PROVISIONING_DEVICE_ADMIN_SIGNATURE_CHECKSUM": signatureChecksum,
-        "android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_CHECKSUM": checksum,
-        "android.app.extra.PROVISIONING_LEAVE_ALL_SYSTEM_APPS_ENABLED": true,
-        "android.app.extra.PROVISIONING_ADMIN_EXTRAS_BUNDLE": {
-            "serverEndpoint": baseOrigin,
-            "token": "tok_" + Date.now(),
-            "autoSeal": true
-        }
+        "android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_DOWNLOAD_LOCATION": downloadLocation
     };
 
     // Only inject Wi-Fi if explicitly specified
@@ -113,7 +116,7 @@ app.get('/api/provisioning-payload', (req, res) => {
         payload["android.app.extra.PROVISIONING_WIFI_PASSWORD"] = password || "";
     }
 
-    res.json({ success: true, host: activeHost, port: PORT, checksum, payload });
+    res.json({ success: true, host: activeHost, port: PORT, signatureChecksum, payload });
 });
 
 // 2. Realtime WebSocket Hub (Sub-second communication)
