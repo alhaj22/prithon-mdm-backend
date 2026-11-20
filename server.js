@@ -82,9 +82,9 @@ function getApkChecksum() {
 
 // Helper: Get URL-safe Base64 SHA-256 of the signing certificate (Google TestDPC standard)
 function getApkSignatureChecksum() {
-    // SHA-256 fingerprint of Android debug signing key:
-    // 62:89:A3:57:62:23:FA:86:42:BA:4D:FA:70:40:20:A6:16:B5:D6:8E:DF:3C:EA:24:34:65:EE:F3:22:D9:FA:18
-    const certHex = '6289a3576223fa8642ba4dfa704020a616b5d68edf3cea243465eef322d9fa18';
+    // SHA-256 fingerprint of Prithon Enterprise Release signing key:
+    // 05:01:41:28:5B:5E:BF:4D:13:24:49:1A:BF:5B:41:75:D4:FB:17:74:8C:0A:47:97:26:AE:E1:13:D9:01:8F:D7
+    const certHex = '050141285b5ebf4d1324491abf5b4175d4fb17748c0a479726aee113d9018fd7';
     return Buffer.from(certHex, 'hex')
         .toString('base64')
         .replace(/\+/g, '-')
@@ -99,8 +99,8 @@ app.get('/api/provisioning-payload', (req, res) => {
     const activeHost = host || reqHost || `${SERVER_HOST}:${PORT}`;
     const baseOrigin = activeHost.startsWith('http') ? activeHost : `${proto}://${activeHost}`;
     
-    // Direct Download URL for Device Policy Controller APK
-    const downloadLocation = `${baseOrigin}/download/app-debug.apk`;
+    // Direct Download URL for Production Device Policy Controller APK
+    const downloadLocation = `${baseOrigin}/download/app-release.apk`;
     const signatureChecksum = getApkSignatureChecksum();
 
     // Clean Google TestDPC-standard 3-Key Payload
