@@ -160,17 +160,20 @@ io.on('connection', (socket) => {
 
     // Customer details submitted from Phone
     socket.on('register_customer', (data) => {
-        const { deviceId, customerName, customerPhone, loanId, emiAmount, dueDate } = data;
+        const { deviceId, customerName, customerPhone, loanId, emiAmount, dueDate, status } = data;
         if (!connectedDevices[deviceId]) {
             connectedDevices[deviceId] = {
                 brand: 'Android',
                 model: 'Device',
-                status: 'NORMAL',
+                status: status || 'NORMAL',
                 online: true,
                 socketId: socket.id,
                 lastSeen: new Date().toLocaleTimeString(),
                 isDeviceOwner: true
             };
+        }
+        if (status) {
+            connectedDevices[deviceId].status = status;
         }
         connectedDevices[deviceId].customerName = customerName || '';
         connectedDevices[deviceId].customerPhone = customerPhone || '';
@@ -178,7 +181,7 @@ io.on('connection', (socket) => {
         connectedDevices[deviceId].emiAmount = emiAmount || '';
         connectedDevices[deviceId].dueDate = dueDate || '';
         saveFleetState();
-        console.log(`[CUSTOMER SAVED via Socket] Device: ${deviceId} -> ${customerName} (${customerPhone})`);
+        console.log(`[CUSTOMER SAVED via Socket] Device: ${deviceId} -> ${customerName} (${customerPhone}) [Status: ${connectedDevices[deviceId].status}]`);
         io.emit('device_list_updated', connectedDevices);
     });
 
