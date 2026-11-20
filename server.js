@@ -74,6 +74,13 @@ function getApkChecksum() {
     return crypto.createHash('sha256').update(fileBuffer).digest('base64url');
 }
 
+// Helper: Get URL-safe Base64 SHA-256 of the signing certificate (Google TestDPC standard)
+function getApkSignatureChecksum() {
+    // Constant debug certificate SHA-256 hex: 6289a3576223fa8642ba4dfa704020a616b5d68edf3cea243465eef322d9fa18
+    const certHex = '6289a3576223fa8642ba4dfa704020a616b5d68edf3cea243465eef322d9fa18';
+    return Buffer.from(certHex, 'hex').toString('base64url');
+}
+
 // 1. Android Enterprise 6-Tap QR Provisioning Endpoint
 app.get('/api/provisioning-payload', (req, res) => {
     const { ssid, password, host } = req.query;
@@ -85,10 +92,12 @@ app.get('/api/provisioning-payload', (req, res) => {
     // Direct Render Cloud Download URL (Direct 200 OK without multi-hop 302 redirects)
     const downloadLocation = `${baseOrigin}/download/app-debug.apk`;
     const checksum = getApkChecksum();
+    const signatureChecksum = getApkSignatureChecksum();
 
     const payload = {
-        "android.app.extra.PROVISIONING_DEVICE_ADMIN_COMPONENT_NAME": "com.prithon.dpc/.receivers.PrithonAdminReceiver",
+        "android.app.extra.PROVISIONING_DEVICE_ADMIN_COMPONENT_NAME": "com.prithon.dpc/com.prithon.dpc.receivers.PrithonAdminReceiver",
         "android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_DOWNLOAD_LOCATION": downloadLocation,
+        "android.app.extra.PROVISIONING_DEVICE_ADMIN_SIGNATURE_CHECKSUM": signatureChecksum,
         "android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_CHECKSUM": checksum,
         "android.app.extra.PROVISIONING_LEAVE_ALL_SYSTEM_APPS_ENABLED": true,
         "android.app.extra.PROVISIONING_ADMIN_EXTRAS_BUNDLE": {
