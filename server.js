@@ -103,11 +103,12 @@ app.get('/api/provisioning-payload', (req, res) => {
     const downloadLocation = `${baseOrigin}/download/app-release.apk`;
     const signatureChecksum = getApkSignatureChecksum();
 
-    // Clean Google TestDPC-standard 3-Key Payload
+    // Clean Google TestDPC-standard Payload with Fully Managed Provisioning Mode
     const payload = {
         "android.app.extra.PROVISIONING_DEVICE_ADMIN_COMPONENT_NAME": "com.prithon.dpc/com.prithon.dpc.receivers.PrithonAdminReceiver",
         "android.app.extra.PROVISIONING_DEVICE_ADMIN_SIGNATURE_CHECKSUM": signatureChecksum,
-        "android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_DOWNLOAD_LOCATION": downloadLocation
+        "android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_DOWNLOAD_LOCATION": downloadLocation,
+        "android.app.extra.PROVISIONING_MODE": 1
     };
 
     // Only inject Wi-Fi if explicitly specified
