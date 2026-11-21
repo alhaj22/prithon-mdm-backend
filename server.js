@@ -6,13 +6,26 @@ const path = require('path');
 const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
+const cookieParser = require('cookie-parser');
+
+const { createTenant, authenticateTenant, findTenantById, findTenantByCode } = require('./src/models/tenantStore');
+const { generateToken, verifyToken, authMiddleware } = require('./src/middleware/auth');
 
 const app = express();
-app.use(cors());
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
+app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'src', 'public')));
 
-// Explicit Dashboard Route
+// Explicit Frontend Page Routes
+app.get('/login', (req, res) => {
+    res.sendFile(path.join(__dirname, 'src', 'public', 'login.html'));
+});
+
+app.get('/signup', (req, res) => {
+    res.sendFile(path.join(__dirname, 'src', 'public', 'signup.html'));
+});
+
 app.get('/dashboard', (req, res) => {
     res.sendFile(path.join(__dirname, 'src', 'public', 'dashboard.html'));
 });
@@ -22,16 +35,16 @@ const apkDir = path.join(__dirname, 'apk');
 if (!fs.existsSync(apkDir)) {
     fs.mkdirSync(apkDir, { recursive: true });
 }
-app.get('/download/app-debug.apk', (req, res, next) => {
+app.get('/download/app-release.apk', (req, res, next) => {
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     const ua = req.headers['user-agent'] || 'Unknown';
-    console.log(`[PROVISIONING DOWNLOAD] Device at IP ${ip} downloading app-debug.apk (UA: ${ua})`);
+    console.log(`[PROVISIONING DOWNLOAD] Device at IP ${ip} downloading app-release.apk (UA: ${ua})`);
     next();
 });
 app.use('/download', express.static(apkDir));
 
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: '*' } });
+const io = new Server(server, { cors: { origin: '*', credentials: true } });
 
 // Detect active local IPv4 address
 function getLocalIpAddress() {
@@ -69,259 +82,414 @@ if (fs.existsSync(stateFilePath)) {
 
 function saveFleetState() {
     try {
-        fs.writeFileSync(stateFilePath, JSON.stringify(connectedDevices, null, 2));
+        const tmpPath = `${stateFilePath}.tmp`;
+        fs.writeFileSync(tmpPath, JSON.stringify(connectedDevices, null, 2));
+        fs.renameSync(tmpPath, stateFilePath);
     } catch (e) {
         console.error('Failed to save fleet state:', e);
     }
 }
 
-// Helper: Calculate URL-safe Base64 SHA-256 for Android Enterprise Provisioning
-function getApkChecksum() {
-    const apkPath = path.join(apkDir, 'app-debug.apk');
-    if (!fs.existsSync(apkPath)) {
-        return 'BUILD_APK_FIRST';
+// Helper: Luhn checksum validator for IMEI
+function isValidImei(imei) {
+    if (!imei) return false;
+    const clean = String(imei).trim().replace(/[^0-9]/g, '');
+    if (clean.length !== 15) return false;
+    let sum = 0;
+    for (let i = 0; i < 15; i++) {
+        let d = parseInt(clean[i], 10);
+        if (i % 2 === 1) {
+            d *= 2;
+            if (d > 9) d = (d % 10) + 1;
+        }
+        sum += d;
     }
-    const fileBuffer = fs.readFileSync(apkPath);
-    return crypto.createHash('sha256').update(fileBuffer).digest('base64url');
+    return sum % 10 === 0;
 }
 
-// Helper: Get URL-safe Base64 SHA-256 of the signing certificate (Google TestDPC standard)
+// Helper: Get URL-safe Base64 SHA-256 of the signing certificate
 function getApkSignatureChecksum() {
-    // SHA-256 fingerprint of Prithon Enterprise Release signing key:
-    // 05:01:41:28:5B:5E:BF:4D:13:24:49:1A:BF:5B:41:75:D4:FB:17:74:8C:0A:47:97:26:AE:E1:13:D9:01:8F:D7
     const certHex = '050141285b5ebf4d1324491abf5b4175d4fb17748c0a479726aee113d9018fd7';
     return Buffer.from(certHex, 'hex')
         .toString('base64')
         .replace(/\+/g, '-')
-        .replace(/\//g, '_'); // Retains '=' padding (44 chars) matching Google TestDPC reference
+        .replace(/\//g, '_');
 }
 
-// 1. Android Enterprise 6-Tap QR Provisioning Endpoint
+// Helper: Get fleet devices filtered strictly by tenantId
+function getTenantDevices(tenantId) {
+    const filtered = {};
+    for (const id in connectedDevices) {
+        if (connectedDevices[id].tenantId === tenantId) {
+            filtered[id] = connectedDevices[id];
+        }
+    }
+    return filtered;
+}
+
+// Helper: Broadcast device updates exclusively to a specific tenant room
+function emitTenantDeviceUpdate(tenantId) {
+    if (!tenantId) return;
+    const tenantDevices = getTenantDevices(tenantId);
+    io.to(`tenant_${tenantId}`).emit('device_list_updated', tenantDevices);
+}
+
+// ==========================================
+// AUTHENTICATION API ROUTES
+// ==========================================
+
+// 1. Retailer Signup
+app.post('/api/auth/signup', async (req, res) => {
+    try {
+        const { shopName, ownerName, email, phone, password } = req.body;
+        if (!shopName || !ownerName || !email || !password) {
+            return res.status(400).json({ error: 'Shop Name, Owner Name, Email, and Password are required.' });
+        }
+        if (password.length < 6) {
+            return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+        }
+
+        const tenant = await createTenant({ shopName, ownerName, email, phone, password });
+        const token = generateToken(tenant);
+
+        res.cookie('prithon_token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 30 * 24 * 60 * 60 * 1000
+        });
+
+        res.status(201).json({
+            success: true,
+            message: 'Shop account created successfully.',
+            token,
+            user: tenant
+        });
+    } catch (err) {
+        console.error('Signup error:', err);
+        res.status(400).json({ error: err.message || 'Signup failed.' });
+    }
+});
+
+// 2. Retailer Login
+app.post('/api/auth/login', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        if (!email || !password) {
+            return res.status(400).json({ error: 'Email and Password are required.' });
+        }
+
+        const tenant = await authenticateTenant(email, password);
+        const token = generateToken(tenant);
+
+        res.cookie('prithon_token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 30 * 24 * 60 * 60 * 1000
+        });
+
+        res.json({
+            success: true,
+            message: 'Login successful.',
+            token,
+            user: tenant
+        });
+    } catch (err) {
+        res.status(401).json({ error: err.message || 'Authentication failed.' });
+    }
+});
+
+// 3. Current User Profile
+app.get('/api/auth/me', authMiddleware, (req, res) => {
+    res.json({ success: true, user: req.user });
+});
+
+// 4. Logout
+app.post('/api/auth/logout', (req, res) => {
+    res.clearCookie('prithon_token');
+    res.json({ success: true, message: 'Logged out successfully.' });
+});
+
+// ==========================================
+// DYNAMIC PROVISIONING PAYLOAD (QR / DPC)
+// ==========================================
+
 app.get('/api/provisioning-payload', (req, res) => {
-    const { ssid, password, host } = req.query;
+    const { ssid, password, host, tenantId, tenantCode } = req.query;
     const proto = req.headers['x-forwarded-proto'] || req.protocol || 'http';
     const reqHost = req.headers['x-forwarded-host'] || req.headers.host;
     const activeHost = host || reqHost || `${SERVER_HOST}:${PORT}`;
     const baseOrigin = activeHost.startsWith('http') ? activeHost : `${proto}://${activeHost}`;
-    
-    // Direct Download URL for Production Device Policy Controller APK
+
     const downloadLocation = `${baseOrigin}/download/app-release.apk`;
     const signatureChecksum = getApkSignatureChecksum();
 
-    // Clean Google TestDPC-standard Payload with Fully Managed Provisioning Mode
+    // Determine target tenant code
+    let resolvedTenantId = tenantId || null;
+    let resolvedTenantCode = tenantCode || null;
+
+    if (tenantCode && !resolvedTenantId) {
+        const tenant = findTenantByCode(tenantCode);
+        if (tenant) {
+            resolvedTenantId = tenant.id;
+            resolvedTenantCode = tenant.tenantCode;
+        }
+    } else if (tenantId && !resolvedTenantCode) {
+        const tenant = findTenantById(tenantId);
+        if (tenant) {
+            resolvedTenantCode = tenant.tenantCode;
+        }
+    }
+
     const payload = {
         "android.app.extra.PROVISIONING_DEVICE_ADMIN_COMPONENT_NAME": "com.prithon.dpc/com.prithon.dpc.receivers.PrithonAdminReceiver",
         "android.app.extra.PROVISIONING_DEVICE_ADMIN_SIGNATURE_CHECKSUM": signatureChecksum,
         "android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_DOWNLOAD_LOCATION": downloadLocation,
-        "android.app.extra.PROVISIONING_MODE": 1
+        "android.app.extra.PROVISIONING_MODE": 1,
+        "android.app.extra.PROVISIONING_ADMIN_EXTRAS_BUNDLE": {
+            "tenantId": resolvedTenantId || "",
+            "tenantCode": resolvedTenantCode || "",
+            "serverUrl": baseOrigin
+        }
     };
 
-    // Only inject Wi-Fi if explicitly specified
     if (ssid && ssid.trim().length > 0) {
         payload["android.app.extra.PROVISIONING_WIFI_SSID"] = ssid.trim();
         payload["android.app.extra.PROVISIONING_WIFI_PASSWORD"] = password || "";
     }
 
-    res.json({ success: true, host: activeHost, port: PORT, signatureChecksum, payload });
-});
-
-// 2. Realtime WebSocket Hub (Sub-second communication)
-io.on('connection', (socket) => {
-    console.log(`[+] Socket connected: ${socket.id}`);
-
-    // Immediately send current fleet list to newly connected dashboard client
-    socket.emit('device_list_updated', connectedDevices);
-
-    // Register newly connected DPC Agent
-    socket.on('register_device', (device) => {
-        const existing = connectedDevices[device.deviceId] || {};
-        connectedDevices[device.deviceId] = {
-            ...existing,
-            socketId: socket.id,
-            brand: device.brand || existing.brand || 'Android',
-            model: device.model || existing.model || 'Device',
-            battery: device.battery ?? existing.battery ?? 100,
-            androidVersion: device.androidVersion || existing.androidVersion || 'Unknown',
-            status: device.status || existing.status || 'NORMAL',
-            online: true,
-            ip: socket.handshake.address,
-            lastSeen: new Date().toLocaleTimeString(),
-            isDeviceOwner: device.isDeviceOwner ?? true,
-            customerName: device.customerName || existing.customerName || '',
-            customerPhone: device.customerPhone || existing.customerPhone || '',
-            loanId: device.loanId || existing.loanId || '',
-            emiAmount: device.emiAmount || existing.emiAmount || '',
-            dueDate: device.dueDate || existing.dueDate || ''
-        };
-        saveFleetState();
-        console.log(`[DEVICE REGISTERED] ${device.brand} ${device.model} (${device.deviceId}) - Customer: ${connectedDevices[device.deviceId].customerName || 'None'}`);
-        io.emit('device_list_updated', connectedDevices);
-    });
-
-    // Customer details submitted from Phone
-    socket.on('register_customer', (data) => {
-        const { deviceId, customerName, customerPhone, loanId, emiAmount, dueDate, status } = data;
-        if (!connectedDevices[deviceId]) {
-            connectedDevices[deviceId] = {
-                brand: 'Android',
-                model: 'Device',
-                status: status || 'NORMAL',
-                online: true,
-                socketId: socket.id,
-                lastSeen: new Date().toLocaleTimeString(),
-                isDeviceOwner: true
-            };
-        }
-        if (status) {
-            connectedDevices[deviceId].status = status;
-        }
-        connectedDevices[deviceId].customerName = customerName || '';
-        connectedDevices[deviceId].customerPhone = customerPhone || '';
-        connectedDevices[deviceId].loanId = loanId || '';
-        connectedDevices[deviceId].emiAmount = emiAmount || '';
-        connectedDevices[deviceId].dueDate = dueDate || '';
-        saveFleetState();
-        console.log(`[CUSTOMER SAVED via Socket] Device: ${deviceId} -> ${customerName} (${customerPhone}) [Status: ${connectedDevices[deviceId].status}]`);
-        io.emit('device_list_updated', connectedDevices);
-    });
-
-    // Device telemetry status change (e.g., NORMAL -> LOCKED)
-    socket.on('device_status_changed', ({ deviceId, status }) => {
-        if (connectedDevices[deviceId]) {
-            connectedDevices[deviceId].status = status;
-            connectedDevices[deviceId].online = true;
-            connectedDevices[deviceId].socketId = socket.id;
-            connectedDevices[deviceId].lastSeen = new Date().toLocaleTimeString();
-            saveFleetState();
-            console.log(`[STATUS CHANGE] Device ${deviceId} -> ${status}`);
-            io.emit('device_list_updated', connectedDevices);
-        }
-    });
-
-    // Installed Applications Inventory from Phone
-    socket.on('apps_inventory', ({ deviceId, apps }) => {
-        if (!connectedDevices[deviceId]) {
-            connectedDevices[deviceId] = {
-                brand: 'Android',
-                model: 'Device',
-                status: 'NORMAL',
-                online: true,
-                socketId: socket.id,
-                lastSeen: new Date().toLocaleTimeString(),
-                isDeviceOwner: true
-            };
-        }
-        connectedDevices[deviceId].apps = apps || [];
-        saveFleetState();
-        console.log(`[APPS INVENTORY] Received ${apps ? apps.length : 0} apps from device ${deviceId}`);
-        io.emit('device_list_updated', connectedDevices);
-    });
-
-    // Periodic heartbeat from phone
-    socket.on('heartbeat', ({ deviceId, battery, status, customerName, customerPhone, loanId, emiAmount }) => {
-        if (connectedDevices[deviceId]) {
-            if (battery !== undefined) connectedDevices[deviceId].battery = battery;
-            if (status !== undefined) connectedDevices[deviceId].status = status;
-            if (customerName) connectedDevices[deviceId].customerName = customerName;
-            if (customerPhone) connectedDevices[deviceId].customerPhone = customerPhone;
-            if (loanId) connectedDevices[deviceId].loanId = loanId;
-            if (emiAmount) connectedDevices[deviceId].emiAmount = emiAmount;
-            connectedDevices[deviceId].online = true;
-            connectedDevices[deviceId].socketId = socket.id;
-            connectedDevices[deviceId].lastSeen = new Date().toLocaleTimeString();
-            io.emit('device_list_updated', connectedDevices);
-        }
-    });
-
-    socket.on('disconnect', () => {
-        for (const [id, dev] of Object.entries(connectedDevices)) {
-            if (dev.socketId === socket.id) {
-                console.log(`[-] Device connection closed: ${dev.brand} ${dev.model} (${id})`);
-                dev.online = false;
-                dev.socketId = null;
-                dev.lastSeen = new Date().toLocaleTimeString();
-                break;
-            }
-        }
-        io.emit('device_list_updated', connectedDevices);
+    res.json({
+        success: true,
+        host: activeHost,
+        tenantId: resolvedTenantId,
+        tenantCode: resolvedTenantCode,
+        payload
     });
 });
 
-// 2b. Fleet REST API Endpoint
-app.get('/api/devices', (req, res) => {
-    res.json(connectedDevices);
+// ==========================================
+// MULTI-TENANT DEVICE MANAGEMENT APIs
+// ==========================================
+
+// Helper: Bind device to tenant and verify IMEI
+function processDeviceRegistration(data, socketId = null, remoteIp = null) {
+    const {
+        deviceId,
+        tenantId,
+        tenantCode,
+        brand,
+        model,
+        battery,
+        androidVersion,
+        status,
+        isDeviceOwner,
+        customerName,
+        customerPhone,
+        loanId,
+        emiAmount,
+        dueDate,
+        enteredImei,
+        hardwareImei
+    } = data;
+
+    if (!deviceId) return null;
+
+    const existing = connectedDevices[deviceId] || {};
+
+    // Resolve tenant binding
+    let finalTenantId = tenantId || existing.tenantId || null;
+    let finalTenantCode = tenantCode || existing.tenantCode || null;
+
+    if (!finalTenantId && finalTenantCode) {
+        const found = findTenantByCode(finalTenantCode);
+        if (found) {
+            finalTenantId = found.id;
+            finalTenantCode = found.tenantCode;
+        }
+    } else if (finalTenantId && !finalTenantCode) {
+        const found = findTenantById(finalTenantId);
+        if (found) {
+            finalTenantCode = found.tenantCode;
+        }
+    }
+
+    // IMEI dual-tracking & verification
+    const cleanEnteredImei = (enteredImei || existing.enteredImei || '').replace(/[^0-9]/g, '');
+    const cleanHardwareImei = (hardwareImei || existing.hardwareImei || '').replace(/[^0-9]/g, '');
+
+    let imeiVerified = false;
+    let imeiStatus = 'PENDING';
+
+    if (cleanEnteredImei.length === 15 && cleanHardwareImei.length === 15) {
+        imeiVerified = (cleanEnteredImei === cleanHardwareImei);
+        imeiStatus = imeiVerified ? 'VERIFIED_MATCH' : 'MISMATCH_WARNING';
+    } else if (cleanEnteredImei.length === 15 && isValidImei(cleanEnteredImei)) {
+        imeiVerified = true;
+        imeiStatus = 'RETAILER_VERIFIED';
+    } else if (cleanHardwareImei.length === 15) {
+        imeiVerified = true;
+        imeiStatus = 'HARDWARE_DETECTED';
+    }
+
+    connectedDevices[deviceId] = {
+        ...existing,
+        deviceId,
+        tenantId: finalTenantId,
+        tenantCode: finalTenantCode,
+        socketId: socketId || existing.socketId || null,
+        brand: brand || existing.brand || 'Android',
+        model: model || existing.model || 'Device',
+        battery: battery ?? existing.battery ?? 100,
+        androidVersion: androidVersion || existing.androidVersion || 'Unknown',
+        status: status || existing.status || 'NORMAL',
+        online: socketId ? true : existing.online || false,
+        ip: remoteIp || existing.ip || '127.0.0.1',
+        lastSeen: new Date().toLocaleTimeString(),
+        isDeviceOwner: isDeviceOwner ?? existing.isDeviceOwner ?? false,
+        customerName: customerName || existing.customerName || '',
+        customerPhone: customerPhone || existing.customerPhone || '',
+        loanId: loanId || existing.loanId || '',
+        emiAmount: emiAmount || existing.emiAmount || '',
+        dueDate: dueDate || existing.dueDate || '',
+        enteredImei: cleanEnteredImei,
+        hardwareImei: cleanHardwareImei,
+        imeiVerified,
+        imeiStatus
+    };
+
+    saveFleetState();
+
+    if (finalTenantId) {
+        emitTenantDeviceUpdate(finalTenantId);
+    }
+
+    return connectedDevices[deviceId];
+}
+
+// REST: Get devices strictly for the authenticated tenant
+app.get('/api/devices', authMiddleware, (req, res) => {
+    const tenantDevices = getTenantDevices(req.user.id);
+    res.json(tenantDevices);
 });
 
-// 2b-2. Device Installed Applications Endpoint
-app.get('/api/devices/:deviceId/apps', (req, res) => {
+// REST: Register device via HTTP (Fallback / Enrollment Hook)
+app.post('/api/devices/register', (req, res) => {
+    const device = processDeviceRegistration(req.body, null, req.ip);
+    if (!device) {
+        return res.status(400).json({ error: 'Device ID is required.' });
+    }
+    res.json({ success: true, device });
+});
+
+// REST: Get Installed Applications for a specific device (Protected)
+app.get('/api/devices/:deviceId/apps', authMiddleware, (req, res) => {
     const { deviceId } = req.params;
     const dev = connectedDevices[deviceId];
-    if (!dev) return res.status(404).json({ error: 'Device not found' });
+    if (!dev) return res.status(404).json({ error: 'Device not found.' });
+    if (dev.tenantId !== req.user.id) {
+        return res.status(403).json({ error: 'Access denied: You do not own this device.' });
+    }
     res.json({ success: true, count: dev.apps ? dev.apps.length : 0, apps: dev.apps || [] });
 });
 
-// 2c. Save/Update Customer Details via REST
-app.post('/api/devices/:deviceId/customer', (req, res) => {
+// REST: Save/Update Customer KYC & IMEI (Protected)
+app.post('/api/devices/:deviceId/customer', authMiddleware, (req, res) => {
     const { deviceId } = req.params;
-    const { customerName, customerPhone, loanId, emiAmount, dueDate } = req.body;
-    if (!connectedDevices[deviceId]) {
-        connectedDevices[deviceId] = {
-            brand: 'Android',
-            model: 'Device',
-            status: 'NORMAL',
-            online: false,
-            lastSeen: new Date().toLocaleTimeString(),
-            isDeviceOwner: true
-        };
+    const dev = connectedDevices[deviceId];
+    if (!dev) return res.status(404).json({ error: 'Device not found.' });
+    if (dev.tenantId !== req.user.id) {
+        return res.status(403).json({ error: 'Access denied: You do not own this device.' });
     }
-    connectedDevices[deviceId].customerName = customerName || '';
-    connectedDevices[deviceId].customerPhone = customerPhone || '';
-    connectedDevices[deviceId].loanId = loanId || '';
-    connectedDevices[deviceId].emiAmount = emiAmount || '';
-    connectedDevices[deviceId].dueDate = dueDate || '';
+
+    const { customerName, customerPhone, loanId, emiAmount, dueDate, enteredImei } = req.body;
+    dev.customerName = customerName || dev.customerName || '';
+    dev.customerPhone = customerPhone || dev.customerPhone || '';
+    dev.loanId = loanId || dev.loanId || '';
+    dev.emiAmount = emiAmount || dev.emiAmount || '';
+    dev.dueDate = dueDate || dev.dueDate || '';
+
+    if (enteredImei) {
+        dev.enteredImei = String(enteredImei).replace(/[^0-9]/g, '');
+        if (dev.hardwareImei) {
+            dev.imeiVerified = (dev.enteredImei === dev.hardwareImei);
+            dev.imeiStatus = dev.imeiVerified ? 'VERIFIED_MATCH' : 'MISMATCH_WARNING';
+        } else {
+            dev.imeiVerified = (dev.enteredImei.length === 15 && isValidImei(dev.enteredImei));
+            dev.imeiStatus = dev.imeiVerified ? 'RETAILER_VERIFIED' : 'PENDING';
+        }
+    }
+
     saveFleetState();
-    io.emit('device_list_updated', connectedDevices);
-    res.json({ success: true, device: connectedDevices[deviceId] });
+    emitTenantDeviceUpdate(req.user.id);
+    res.json({ success: true, device: dev });
 });
 
-// 3. REST API to trigger Remote Commands
-app.post('/api/devices/:deviceId/command', (req, res) => {
+// REST: Remote Command Dispatch (Protected & Strictly Isolated)
+app.post('/api/devices/:deviceId/command', authMiddleware, (req, res) => {
     const { deviceId } = req.params;
     const { command } = req.body; // 'LOCK', 'UNLOCK', 'ALARM'
 
     const target = connectedDevices[deviceId];
     if (!target) {
-        return res.status(404).json({ error: 'Device is offline or not registered' });
+        return res.status(404).json({ error: 'Device is offline or not registered.' });
     }
 
-    console.log(`[DISPATCH COMMAND] Sending ${command} to device: ${deviceId}`);
-    io.to(target.socketId).emit('server_command', { 
-        command, 
-        customer: {
-            name: target.customerName || '',
-            phone: target.customerPhone || '',
-            loanId: target.loanId || '',
-            emiAmount: target.emiAmount || ''
-        },
-        timestamp: Date.now() 
-    });
+    // STRICT MULTI-TENANT AUTHORIZATION CHECK
+    if (target.tenantId !== req.user.id) {
+        return res.status(403).json({ error: 'Unauthorized: This device does not belong to your shop account.' });
+    }
+
+    console.log(`[DISPATCH COMMAND] Shop ${req.user.shopName} (${req.user.tenantCode}) sending ${command} to device: ${deviceId}`);
+
+    if (target.socketId) {
+        io.to(target.socketId).emit('server_command', {
+            command,
+            customer: {
+                name: target.customerName || '',
+                phone: target.customerPhone || '',
+                loanId: target.loanId || '',
+                emiAmount: target.emiAmount || ''
+            },
+            timestamp: Date.now()
+        });
+    }
 
     // Optimistically update status
     if (command === 'LOCK') target.status = 'LOCKED';
     if (command === 'UNLOCK') target.status = 'NORMAL';
-    io.emit('device_list_updated', connectedDevices);
+    saveFleetState();
+    emitTenantDeviceUpdate(req.user.id);
 
     res.json({ success: true, message: `Command ${command} dispatched to device.` });
 });
 
-// 4. Payment Gateway Webhook (Auto-Unlock in Sub-3 Seconds)
+// REST: Payment Gateway Webhook (Auto-Unlock)
 app.post('/api/webhook/payment-received', (req, res) => {
-    const { deviceId, status } = req.body;
-    if (status === 'SUCCESS' && connectedDevices[deviceId]) {
-        console.log(`[PAYMENT WEBHOOK] Payment verified for ${deviceId}. Unlocking device automatically.`);
-        io.to(connectedDevices[deviceId].socketId).emit('server_command', { command: 'UNLOCK' });
-        connectedDevices[deviceId].status = 'NORMAL';
-        io.emit('device_list_updated', connectedDevices);
+    const { deviceId, status, loanId } = req.body;
+
+    let target = null;
+    if (deviceId && connectedDevices[deviceId]) {
+        target = connectedDevices[deviceId];
+    } else if (loanId) {
+        for (const id in connectedDevices) {
+            if (connectedDevices[id].loanId === loanId) {
+                target = connectedDevices[id];
+                break;
+            }
+        }
+    }
+
+    if (status === 'SUCCESS' && target) {
+        console.log(`[PAYMENT WEBHOOK] Payment verified for ${target.deviceId}. Unlocking device automatically.`);
+        if (target.socketId) {
+            io.to(target.socketId).emit('server_command', { command: 'UNLOCK' });
+        }
+        target.status = 'NORMAL';
+        saveFleetState();
+        if (target.tenantId) {
+            emitTenantDeviceUpdate(target.tenantId);
+        }
         return res.json({ success: true, message: 'Device unlocked via automated payment webhook.' });
     }
     res.json({ received: true });
@@ -336,12 +504,107 @@ app.get('/terms', (req, res) => {
     res.sendFile(path.join(__dirname, 'src', 'public', 'terms.html'));
 });
 
+// ==========================================
+// REAL-TIME WEBSOCKET HUB (MULTI-TENANT)
+// ==========================================
+
+io.on('connection', (socket) => {
+    // Authenticated Dashboard joins its isolated tenant room
+    socket.on('join_tenant', ({ token }) => {
+        const decoded = verifyToken(token);
+        if (decoded && decoded.tenantId) {
+            const roomName = `tenant_${decoded.tenantId}`;
+            socket.join(roomName);
+            socket.tenantId = decoded.tenantId;
+            console.log(`[DASHBOARD JOINED] Tenant ${decoded.shopName} (${decoded.tenantCode}) joined room ${roomName}`);
+            // Send initial tenant device list
+            const tenantDevices = getTenantDevices(decoded.tenantId);
+            socket.emit('device_list_updated', tenantDevices);
+        }
+    });
+
+    // Register newly connected DPC Agent
+    socket.on('register_device', (data) => {
+        const device = processDeviceRegistration(data, socket.id, socket.handshake.address);
+        console.log(`[DPC REGISTERED] ${device.brand} ${device.model} (${device.deviceId}) - Tenant: ${device.tenantCode || 'Unassigned'}`);
+    });
+
+    // Customer details submitted from Phone
+    socket.on('register_customer', (data) => {
+        const device = processDeviceRegistration(data, socket.id, socket.handshake.address);
+        console.log(`[CUSTOMER SYNCED] ${device.customerName} on device ${device.deviceId} - Status: ${device.status}`);
+    });
+
+    // Device telemetry status change (e.g., NORMAL -> LOCKED)
+    socket.on('device_status_changed', ({ deviceId, status }) => {
+        if (connectedDevices[deviceId]) {
+            connectedDevices[deviceId].status = status;
+            connectedDevices[deviceId].online = true;
+            connectedDevices[deviceId].socketId = socket.id;
+            connectedDevices[deviceId].lastSeen = new Date().toLocaleTimeString();
+            saveFleetState();
+            console.log(`[STATUS CHANGE] Device ${deviceId} -> ${status}`);
+            if (connectedDevices[deviceId].tenantId) {
+                emitTenantDeviceUpdate(connectedDevices[deviceId].tenantId);
+            }
+        }
+    });
+
+    // Installed Applications Inventory from Phone
+    socket.on('apps_inventory', ({ deviceId, apps }) => {
+        if (connectedDevices[deviceId]) {
+            connectedDevices[deviceId].apps = apps || [];
+            saveFleetState();
+            if (connectedDevices[deviceId].tenantId) {
+                emitTenantDeviceUpdate(connectedDevices[deviceId].tenantId);
+            }
+        }
+    });
+
+    // Periodic heartbeat from phone
+    socket.on('heartbeat', ({ deviceId, battery, status, customerName, customerPhone, loanId, emiAmount, enteredImei, hardwareImei }) => {
+        if (connectedDevices[deviceId]) {
+            if (battery !== undefined) connectedDevices[deviceId].battery = battery;
+            if (status !== undefined) connectedDevices[deviceId].status = status;
+            if (customerName) connectedDevices[deviceId].customerName = customerName;
+            if (customerPhone) connectedDevices[deviceId].customerPhone = customerPhone;
+            if (loanId) connectedDevices[deviceId].loanId = loanId;
+            if (emiAmount) connectedDevices[deviceId].emiAmount = emiAmount;
+            if (enteredImei) connectedDevices[deviceId].enteredImei = enteredImei;
+            if (hardwareImei) connectedDevices[deviceId].hardwareImei = hardwareImei;
+            connectedDevices[deviceId].online = true;
+            connectedDevices[deviceId].socketId = socket.id;
+            connectedDevices[deviceId].lastSeen = new Date().toLocaleTimeString();
+            if (connectedDevices[deviceId].tenantId) {
+                emitTenantDeviceUpdate(connectedDevices[deviceId].tenantId);
+            }
+        }
+    });
+
+    socket.on('disconnect', () => {
+        for (const [id, dev] of Object.entries(connectedDevices)) {
+            if (dev.socketId === socket.id) {
+                console.log(`[-] Device connection closed: ${dev.brand} ${dev.model} (${id})`);
+                dev.online = false;
+                dev.socketId = null;
+                dev.lastSeen = new Date().toLocaleTimeString();
+                if (dev.tenantId) {
+                    emitTenantDeviceUpdate(dev.tenantId);
+                }
+                break;
+            }
+        }
+    });
+});
+
 // Start Server
 server.listen(PORT, '0.0.0.0', () => {
     console.log('====================================================');
-    console.log(`  PRITHON TECH | ENTERPRISE MDM CONTROL PLANE`);
+    console.log(`  PRITHON TECH | ENTERPRISE MULTI-TENANT MDM`);
     console.log(`  Local Server IP: http://${SERVER_HOST}:${PORT}`);
-    console.log(`  Dashboard:       http://${SERVER_HOST}:${PORT}/`);
-    console.log(`  APK Download:    http://${SERVER_HOST}:${PORT}/download/app-debug.apk`);
+    console.log(`  Login Page:      http://${SERVER_HOST}:${PORT}/login`);
+    console.log(`  Signup Page:     http://${SERVER_HOST}:${PORT}/signup`);
+    console.log(`  Dashboard:       http://${SERVER_HOST}:${PORT}/dashboard`);
+    console.log(`  APK Download:    http://${SERVER_HOST}:${PORT}/download/app-release.apk`);
     console.log('====================================================');
 });

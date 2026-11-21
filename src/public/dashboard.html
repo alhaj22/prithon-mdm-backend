@@ -678,12 +678,17 @@
         <header>
             <div class="header-title">
                 <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                <span>Prithon Tech</span>
-                <span class="system-tag">MDM Fleet Console</span>
+                <span id="tenant-shop-name">Prithon Tech</span>
+                <span class="system-tag" id="tenant-code-tag">MDM Fleet Console</span>
             </div>
-            <div class="connection-indicator">
-                <span class="indicator-dot" id="socket-dot"></span>
-                <span id="socket-status-text">Connected</span>
+            <div style="display: flex; gap: 14px; align-items: center;">
+                <div class="connection-indicator">
+                    <span class="indicator-dot" id="socket-dot"></span>
+                    <span id="socket-status-text">Connected</span>
+                </div>
+                <button id="btn-logout" style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.25); color: #f87171; font-size: 11.5px; font-weight: 600; padding: 6px 12px; border-radius: 4px; cursor: pointer;">
+                    Sign Out
+                </button>
             </div>
         </header>
 
@@ -731,9 +736,17 @@
         <!-- TAB 2: PROVISIONING -->
         <div id="tab-provisioning" class="tab-panel">
             <div class="panel-box">
-                <div class="panel-title">Android Enterprise Enrollment Payload</div>
+                <div class="panel-title">Your Unique Shop Enrollment QR &amp; Code</div>
                 <div class="panel-desc">
-                    Configure local wireless parameters. The QR code generates an authenticated enrollment bundle containing the package location, cryptographic checksum, and Device Owner directives.
+                    Every device provisioned with this barcode or using your Shop Code will be permanently and exclusively linked to your shop account.
+                </div>
+
+                <div style="background: rgba(0, 229, 255, 0.08); border: 1px solid rgba(0, 229, 255, 0.25); border-radius: 8px; padding: 14px 18px; margin-bottom: 20px;">
+                    <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; margin-bottom: 4px;">Your Assigned Shop Code</div>
+                    <div style="font-size: 26px; font-weight: 800; color: #00E5FF; font-family: 'JetBrains Mono', monospace;" id="display-tenant-code">LOADING...</div>
+                    <div style="font-size: 12px; color: #cbd5e1; margin-top: 4px;">
+                        When installing the APK directly on a customer's phone, enter this 6-digit Shop Code to pair the device instantly with your dashboard.
+                    </div>
                 </div>
 
                 <div class="form-group">
@@ -742,7 +755,7 @@
                 </div>
 
                 <button class="btn btn-primary" onclick="generateEnrollmentQr()">
-                    Generate Provisioning Code
+                    Generate Authenticated Provisioning QR
                 </button>
 
                 <div class="qr-output-container">
@@ -821,7 +834,61 @@
     </footer>
 
     <script>
-        const socket = io();
+        // Mandatory Authentication Check
+        const authToken = localStorage.getItem("prithon_token");
+        if (!authToken) {
+            window.location.replace("/login");
+        }
+
+        let currentUser = null;
+        try {
+            currentUser = JSON.parse(localStorage.getItem("prithon_user"));
+        } catch (e) {}
+
+        function updateTenantUI() {
+            if (!currentUser) return;
+            const shopNameEl = document.getElementById("tenant-shop-name");
+            const codeTagEl = document.getElementById("tenant-code-tag");
+            const displayCodeEl = document.getElementById("display-tenant-code");
+
+            if (shopNameEl) shopNameEl.innerText = currentUser.shopName || "Shop Portal";
+            if (codeTagEl) codeTagEl.innerText = `Shop Code: ${currentUser.tenantCode || "ACTIVE"}`;
+            if (displayCodeEl) displayCodeEl.innerText = currentUser.tenantCode || "ACTIVE";
+        }
+
+        updateTenantUI();
+
+        // Verify token with backend
+        fetch("/api/auth/me", {
+            headers: { "Authorization": `Bearer ${authToken}` }
+        })
+        .then(res => {
+            if (!res.ok) throw new Error("Unauthenticated");
+            return res.json();
+        })
+        .then(data => {
+            currentUser = data.user;
+            localStorage.setItem("prithon_user", JSON.stringify(currentUser));
+            updateTenantUI();
+        })
+        .catch(() => {
+            localStorage.removeItem("prithon_token");
+            localStorage.removeItem("prithon_user");
+            window.location.replace("/login");
+        });
+
+        // Logout listener
+        document.getElementById("btn-logout")?.addEventListener("click", () => {
+            fetch("/api/auth/logout", { method: "POST" }).finally(() => {
+                localStorage.removeItem("prithon_token");
+                localStorage.removeItem("prithon_user");
+                window.location.replace("/login");
+            });
+        });
+
+        const socket = io({
+            auth: { token: authToken }
+        });
         let registeredDevices = {};
 
         function switchTab(targetId) {
@@ -834,6 +901,7 @@
         socket.on('connect', () => {
             document.getElementById('socket-dot').classList.remove('offline');
             document.getElementById('socket-status-text').innerText = 'Connected';
+            socket.emit('join_tenant', { token: authToken });
         });
 
         socket.on('disconnect', () => {
@@ -947,6 +1015,13 @@
 
                     <div class="data-table">
                         <div class="data-row">
+                            <span>Device IMEI (Dual Check)</span>
+                            <span>
+                                ${dev.enteredImei ? escapeHtml(dev.enteredImei) : (dev.hardwareImei ? escapeHtml(dev.hardwareImei) : "<span style=\"color:#71717a;\">Not Recorded</span>")}
+                                ${dev.imeiVerified ? "<span style=\"color:#10b981; font-weight:700; margin-left:4px;\">✓ Verified</span>" : (dev.enteredImei ? "<span style=\"color:#f59e0b; margin-left:4px;\">⏳ Pending</span>" : "")}
+                            </span>
+                        </div>
+                        <div class="data-row">
                             <span>Battery Status</span>
                             <span>${dev.battery}%</span>
                         </div>
@@ -977,7 +1052,9 @@
         }
 
         // Fetch initial list via REST API on page load
-        fetch('/api/devices')
+        fetch('/api/devices', {
+            headers: { "Authorization": `Bearer ${authToken}` }
+        })
             .then(res => res.json())
             .then(devices => renderDeviceList(devices))
             .catch(() => {});
@@ -986,7 +1063,10 @@
             try {
                 const response = await fetch(`/api/devices/${encodeURIComponent(deviceId)}/command`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
                     body: JSON.stringify({ command })
                 });
                 const res = await response.json();
@@ -1002,17 +1082,24 @@
             if (customerName === null) return;
             const customerPhone = prompt('Enter Customer Mobile Number:', current.customerPhone || '');
             if (customerPhone === null) return;
+            const enteredImei = prompt('Enter 15-Digit Device IMEI Number:', current.enteredImei || '');
+            if (enteredImei === null) return;
             const loanId = prompt('Enter Loan / Account ID:', current.loanId || '');
             if (loanId === null) return;
             const emiAmount = prompt('Enter Monthly EMI Amount (INR):', current.emiAmount || '');
             if (emiAmount === null) return;
 
             try {
-                await fetch(`/api/devices/${encodeURIComponent(deviceId)}/customer`, {
+                const response = await fetch(`/api/devices/${encodeURIComponent(deviceId)}/customer`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ customerName, customerPhone, loanId, emiAmount })
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({ customerName, customerPhone, enteredImei, loanId, emiAmount })
                 });
+                const res = await response.json();
+                if (!response.ok) alert(res.error || 'Update failed');
             } catch (err) {
                 alert('Failed to update customer: ' + err.message);
             }
@@ -1043,8 +1130,10 @@
             const ssid = document.getElementById('wifi-ssid').value.trim();
             const pass = document.getElementById('wifi-pass').value.trim();
             const host = window.location.origin;
+            const tenantId = currentUser ? currentUser.id : '';
+            const tenantCode = currentUser ? currentUser.tenantCode : '';
 
-            const response = await fetch(`/api/provisioning-payload?ssid=${encodeURIComponent(ssid)}&password=${encodeURIComponent(pass)}&host=${encodeURIComponent(host)}`);
+            const response = await fetch(`/api/provisioning-payload?ssid=${encodeURIComponent(ssid)}&password=${encodeURIComponent(pass)}&host=${encodeURIComponent(host)}&tenantId=${encodeURIComponent(tenantId)}&tenantCode=${encodeURIComponent(tenantCode)}`);
             const data = await response.json();
 
             const target = document.getElementById('qr-target');
@@ -1095,7 +1184,9 @@
             grid.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #71717a;">Loading applications from device...</div>';
 
             try {
-                const res = await fetch(`/api/devices/${encodeURIComponent(deviceId)}/apps`);
+                const res = await fetch(`/api/devices/${encodeURIComponent(deviceId)}/apps`, {
+                    headers: { "Authorization": `Bearer ${authToken}` }
+                });
                 const data = await res.json();
                 if (data.success && data.apps && data.apps.length > 0) {
                     currentAppsList = data.apps;
@@ -1126,7 +1217,10 @@
             try {
                 await fetch(`/api/devices/${encodeURIComponent(activeModalDeviceId)}/command`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
                     body: JSON.stringify({ command: 'GET_APPS' })
                 });
                 btnText.innerText = 'Sent! Waiting sync...';
