@@ -10,6 +10,7 @@ const cookieParser = require('cookie-parser');
 
 const { createTenant, authenticateTenant, findTenantById, findTenantByCode } = require('./src/models/tenantStore');
 const { generateToken, verifyToken, authMiddleware } = require('./src/middleware/auth');
+const db = require('./src/db/db');
 
 const app = express();
 app.use(cors({ origin: true, credentials: true }));
@@ -80,11 +81,81 @@ if (fs.existsSync(stateFilePath)) {
     }
 }
 
+async function persistDeviceToPostgres(dev) {
+    if (!db.isPostgresConnected()) return;
+    try {
+        const queryText = `
+            INSERT INTO devices (
+                device_id, tenant_id, tenant_code, brand, model, battery, android_version,
+                status, online, ip, last_seen, is_device_owner, customer_name, customer_phone,
+                loan_id, emi_amount, due_date, entered_imei, hardware_imei, imei_verified, imei_status, apps, updated_at
+            ) VALUES (
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, NOW()
+            )
+            ON CONFLICT (device_id) DO UPDATE SET
+                tenant_id = EXCLUDED.tenant_id,
+                tenant_code = EXCLUDED.tenant_code,
+                brand = EXCLUDED.brand,
+                model = EXCLUDED.model,
+                battery = EXCLUDED.battery,
+                android_version = EXCLUDED.android_version,
+                status = EXCLUDED.status,
+                online = EXCLUDED.online,
+                ip = EXCLUDED.ip,
+                last_seen = EXCLUDED.last_seen,
+                is_device_owner = EXCLUDED.is_device_owner,
+                customer_name = COALESCE(EXCLUDED.customer_name, devices.customer_name),
+                customer_phone = COALESCE(EXCLUDED.customer_phone, devices.customer_phone),
+                loan_id = COALESCE(EXCLUDED.loan_id, devices.loan_id),
+                emi_amount = COALESCE(EXCLUDED.emi_amount, devices.emi_amount),
+                due_date = COALESCE(EXCLUDED.due_date, devices.due_date),
+                entered_imei = COALESCE(EXCLUDED.entered_imei, devices.entered_imei),
+                hardware_imei = COALESCE(EXCLUDED.hardware_imei, devices.hardware_imei),
+                imei_verified = EXCLUDED.imei_verified,
+                imei_status = EXCLUDED.imei_status,
+                apps = COALESCE(EXCLUDED.apps, devices.apps),
+                updated_at = NOW();
+        `;
+        await db.query(queryText, [
+            dev.deviceId,
+            dev.tenantId || null,
+            dev.tenantCode || null,
+            dev.brand || 'Android',
+            dev.model || 'Device',
+            dev.battery || 100,
+            dev.androidVersion || 'Unknown',
+            dev.status || 'NORMAL',
+            dev.online || false,
+            dev.ip || null,
+            dev.lastSeen || new Date().toISOString(),
+            dev.isDeviceOwner || false,
+            dev.customerName || null,
+            dev.customerPhone || null,
+            dev.loanId || null,
+            dev.emiAmount || null,
+            dev.dueDate || null,
+            dev.enteredImei || null,
+            dev.hardwareImei || null,
+            dev.imeiVerified || false,
+            dev.imeiStatus || 'PENDING',
+            JSON.stringify(dev.apps || [])
+        ]);
+    } catch (e) {
+        console.error('[POSTGRESQL] Failed to persist device:', e.message);
+    }
+}
+
 function saveFleetState() {
     try {
         const tmpPath = `${stateFilePath}.tmp`;
         fs.writeFileSync(tmpPath, JSON.stringify(connectedDevices, null, 2));
         fs.renameSync(tmpPath, stateFilePath);
+
+        if (db.isPostgresConnected()) {
+            for (const dev of Object.values(connectedDevices)) {
+                persistDeviceToPostgres(dev).catch(() => {});
+            }
+        }
     } catch (e) {
         console.error('Failed to save fleet state:', e);
     }
@@ -215,7 +286,7 @@ app.post('/api/auth/logout', (req, res) => {
 // DYNAMIC PROVISIONING PAYLOAD (QR / DPC)
 // ==========================================
 
-app.get('/api/provisioning-payload', (req, res) => {
+app.get('/api/provisioning-payload', async (req, res) => {
     const { ssid, password, host, tenantId, tenantCode } = req.query;
     const proto = req.headers['x-forwarded-proto'] || req.protocol || 'http';
     const reqHost = req.headers['x-forwarded-host'] || req.headers.host;
@@ -230,13 +301,13 @@ app.get('/api/provisioning-payload', (req, res) => {
     let resolvedTenantCode = tenantCode || null;
 
     if (tenantCode && !resolvedTenantId) {
-        const tenant = findTenantByCode(tenantCode);
+        const tenant = await findTenantByCode(tenantCode);
         if (tenant) {
             resolvedTenantId = tenant.id;
             resolvedTenantCode = tenant.tenantCode;
         }
     } else if (tenantId && !resolvedTenantCode) {
-        const tenant = findTenantById(tenantId);
+        const tenant = await findTenantById(tenantId);
         if (tenant) {
             resolvedTenantCode = tenant.tenantCode;
         }
@@ -273,7 +344,7 @@ app.get('/api/provisioning-payload', (req, res) => {
 // ==========================================
 
 // Helper: Bind device to tenant and verify IMEI
-function processDeviceRegistration(data, socketId = null, remoteIp = null) {
+async function processDeviceRegistration(data, socketId = null, remoteIp = null) {
     const {
         deviceId,
         tenantId,
@@ -298,20 +369,23 @@ function processDeviceRegistration(data, socketId = null, remoteIp = null) {
     const existing = connectedDevices[deviceId] || {};
 
     // Resolve tenant binding
-    let finalTenantId = tenantId || existing.tenantId || null;
-    let finalTenantCode = tenantCode || existing.tenantCode || null;
+    let finalTenantId = tenantId || null;
+    let finalTenantCode = tenantCode || null;
 
-    if (!finalTenantId && finalTenantCode) {
-        const found = findTenantByCode(finalTenantCode);
+    if (finalTenantCode) {
+        const found = await findTenantByCode(finalTenantCode);
         if (found) {
             finalTenantId = found.id;
             finalTenantCode = found.tenantCode;
         }
-    } else if (finalTenantId && !finalTenantCode) {
-        const found = findTenantById(finalTenantId);
+    } else if (finalTenantId) {
+        const found = await findTenantById(finalTenantId);
         if (found) {
             finalTenantCode = found.tenantCode;
         }
+    } else {
+        finalTenantId = existing.tenantId || null;
+        finalTenantCode = existing.tenantCode || null;
     }
 
     // IMEI dual-tracking & verification
@@ -374,8 +448,8 @@ app.get('/api/devices', authMiddleware, (req, res) => {
 });
 
 // REST: Register device via HTTP (Fallback / Enrollment Hook)
-app.post('/api/devices/register', (req, res) => {
-    const device = processDeviceRegistration(req.body, null, req.ip);
+app.post('/api/devices/register', async (req, res) => {
+    const device = await processDeviceRegistration(req.body, null, req.ip);
     if (!device) {
         return res.status(400).json({ error: 'Device ID is required.' });
     }
@@ -524,15 +598,19 @@ io.on('connection', (socket) => {
     });
 
     // Register newly connected DPC Agent
-    socket.on('register_device', (data) => {
-        const device = processDeviceRegistration(data, socket.id, socket.handshake.address);
-        console.log(`[DPC REGISTERED] ${device.brand} ${device.model} (${device.deviceId}) - Tenant: ${device.tenantCode || 'Unassigned'}`);
+    socket.on('register_device', async (data) => {
+        const device = await processDeviceRegistration(data, socket.id, socket.handshake.address);
+        if (device) {
+            console.log(`[DPC REGISTERED] ${device.brand} ${device.model} (${device.deviceId}) - Tenant: ${device.tenantCode || 'Unassigned'}`);
+        }
     });
 
     // Customer details submitted from Phone
-    socket.on('register_customer', (data) => {
-        const device = processDeviceRegistration(data, socket.id, socket.handshake.address);
-        console.log(`[CUSTOMER SYNCED] ${device.customerName} on device ${device.deviceId} - Status: ${device.status}`);
+    socket.on('register_customer', async (data) => {
+        const device = await processDeviceRegistration(data, socket.id, socket.handshake.address);
+        if (device) {
+            console.log(`[CUSTOMER SYNCED] ${device.customerName} on device ${device.deviceId} - Status: ${device.status}`);
+        }
     });
 
     // Device telemetry status change (e.g., NORMAL -> LOCKED)
@@ -598,7 +676,7 @@ io.on('connection', (socket) => {
 });
 
 // Start Server
-server.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, '0.0.0.0', async () => {
     console.log('====================================================');
     console.log(`  PRITHON TECH | ENTERPRISE MULTI-TENANT MDM`);
     console.log(`  Local Server IP: http://${SERVER_HOST}:${PORT}`);
@@ -607,4 +685,44 @@ server.listen(PORT, '0.0.0.0', () => {
     console.log(`  Dashboard:       http://${SERVER_HOST}:${PORT}/dashboard`);
     console.log(`  APK Download:    http://${SERVER_HOST}:${PORT}/download/app-release.apk`);
     console.log('====================================================');
+
+    // Initialize PostgreSQL
+    const pgConnected = await db.initDatabase();
+    if (pgConnected) {
+        try {
+            const res = await db.query('SELECT * FROM devices');
+            for (const row of res.rows) {
+                if (!connectedDevices[row.device_id]) {
+                    connectedDevices[row.device_id] = {
+                        deviceId: row.device_id,
+                        tenantId: row.tenant_id,
+                        tenantCode: row.tenant_code,
+                        brand: row.brand,
+                        model: row.model,
+                        battery: row.battery,
+                        androidVersion: row.android_version,
+                        status: row.status,
+                        online: false,
+                        socketId: null,
+                        ip: row.ip,
+                        lastSeen: row.last_seen,
+                        isDeviceOwner: row.is_device_owner,
+                        customerName: row.customer_name,
+                        customerPhone: row.customer_phone,
+                        loanId: row.loan_id,
+                        emiAmount: row.emi_amount,
+                        dueDate: row.due_date,
+                        enteredImei: row.entered_imei,
+                        hardwareImei: row.hardware_imei,
+                        imeiVerified: row.imei_verified,
+                        imeiStatus: row.imei_status,
+                        apps: typeof row.apps === 'string' ? JSON.parse(row.apps) : (row.apps || [])
+                    };
+                }
+            }
+            console.log(`[POSTGRESQL] Loaded ${res.rows.length} devices from PostgreSQL database.`);
+        } catch (e) {
+            console.warn('[POSTGRESQL WARNING] Failed loading devices:', e.message);
+        }
+    }
 });

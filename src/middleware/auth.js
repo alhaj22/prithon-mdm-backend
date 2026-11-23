@@ -24,7 +24,7 @@ function verifyToken(token) {
     }
 }
 
-function authMiddleware(req, res, next) {
+async function authMiddleware(req, res, next) {
     let token = null;
 
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
@@ -44,7 +44,7 @@ function authMiddleware(req, res, next) {
         return res.status(401).json({ error: 'Session expired or invalid token. Please log in again.' });
     }
 
-    const tenant = findTenantById(decoded.tenantId);
+    const tenant = await findTenantById(decoded.tenantId);
     if (!tenant) {
         return res.status(401).json({ error: 'Tenant account not found.' });
     }
