@@ -283,6 +283,32 @@ app.post('/api/auth/logout', (req, res) => {
     res.json({ success: true, message: 'Logged out successfully.' });
 });
 
+// Diagnostic DB Status
+app.get('/api/db-status', async (req, res) => {
+    const isConn = db.isPostgresConnected();
+    let testResult = null;
+    let error = null;
+    try {
+        if (db.pool) {
+            const client = await db.pool.connect();
+            const q = await client.query('SELECT NOW() as time, current_database() as db');
+            client.release();
+            testResult = q.rows[0];
+        } else {
+            error = 'db.pool is null';
+        }
+    } catch (e) {
+        error = e.message;
+    }
+    res.json({
+        hasDatabaseUrl: !!process.env.DATABASE_URL,
+        databaseUrlMasked: process.env.DATABASE_URL ? process.env.DATABASE_URL.replace(/:[^:]*@/, ':****@') : null,
+        isConnected: isConn,
+        testResult,
+        error
+    });
+});
+
 // ==========================================
 // DYNAMIC PROVISIONING PAYLOAD (QR / DPC)
 // ==========================================
