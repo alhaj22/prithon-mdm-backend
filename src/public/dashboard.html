@@ -989,9 +989,9 @@
                                 </div>
                             </div>
                             ${dev.customerPhone ? `
-                                <a href="sms:${escapeHtml(dev.customerPhone)}?body=%23PRITHON%3ALOCK%3A${encodeURIComponent(dev.loanId || 'ADMIN')}%23" style="background: #27272a; border: 1px solid #3f3f46; color: #f4f4f5; text-decoration: none; padding: 5px 9px; border-radius: 4px; font-size: 11px; font-weight: 600; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;" title="Send SMS from default messaging app">
+                                <button onclick="handleSendSms('${escapeHtml(dev.customerPhone)}', '${escapeHtml(dev.loanId || 'ADMIN')}')" style="background: #27272a; border: 1px solid #3f3f46; color: #f4f4f5; padding: 5px 9px; border-radius: 4px; font-size: 11px; font-weight: 600; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; cursor: pointer;" title="Send Offline SMS Command">
                                     Send SMS
-                                </a>
+                                </button>
                             ` : ''}
                         </div>
                     ` : `
@@ -1058,6 +1058,20 @@
             .then(res => res.json())
             .then(devices => renderDeviceList(devices))
             .catch(() => {});
+
+        function handleSendSms(phone, loanId) {
+            const code = `#PRITHON:LOCK:${loanId || 'ADMIN'}#`;
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+            if (isMobile) {
+                window.location.href = `sms:${phone}?body=${encodeURIComponent(code)}`;
+            } else {
+                navigator.clipboard.writeText(code).then(() => {
+                    alert(`📡 OFFLINE SMS LOCK:\n\n1. Kisi bhi phone se customer ke number (${phone}) par yeh SMS bhejein:\n\n${code}\n\n✓ SMS Code clipboard me copy ho gaya hai!\n\nNote: Website se direct 1-click lock karne ke liye neeche diye gaye Red color ke "Lock Device" button par click karein!`);
+                }).catch(() => {
+                    alert(`📡 OFFLINE SMS LOCK:\n\nKisi bhi phone se customer ke number (${phone}) par yeh SMS bhejein:\n\n${code}`);
+                });
+            }
+        }
 
         async function issueCommand(deviceId, command) {
             try {
