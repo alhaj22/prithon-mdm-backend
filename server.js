@@ -586,6 +586,74 @@ app.post('/api/devices/:deviceId/command', authMiddleware, (req, res) => {
     res.json({ success: true, message: `Command ${command} dispatched to device.` });
 });
 
+// REST: Delete / Release Device (Removes all finance locks and automatically uninstalls app from phone)
+app.delete('/api/devices/:deviceId', authMiddleware, async (req, res) => {
+    const { deviceId } = req.params;
+    const target = connectedDevices[deviceId];
+
+    if (!target) {
+        if (db.isPostgresConnected()) {
+            try {
+                const dbRes = await db.query('SELECT * FROM devices WHERE device_id = $1', [deviceId]);
+                if (dbRes.rows.length === 0) {
+                    return res.status(404).json({ error: 'Device not found.' });
+                }
+                if (dbRes.rows[0].tenant_id !== req.user.id) {
+                    return res.status(403).json({ error: 'Unauthorized: This device does not belong to your shop account.' });
+                }
+                await db.query('DELETE FROM devices WHERE device_id = $1 AND tenant_id = $2', [deviceId, req.user.id]);
+                emitTenantDeviceUpdate(req.user.id);
+                return res.json({ success: true, message: 'Device deleted from database.' });
+            } catch (e) {
+                return res.status(500).json({ error: e.message });
+            }
+        }
+        return res.status(404).json({ error: 'Device not found.' });
+    }
+
+    // STRICT MULTI-TENANT AUTHORIZATION CHECK
+    if (target.tenantId !== req.user.id) {
+        return res.status(403).json({ error: 'Unauthorized: This device does not belong to your shop account.' });
+    }
+
+    console.log(`[RELEASE & DELETE] Shop ${req.user.shopName} (${req.user.tenantCode}) deleting device: ${deviceId}`);
+
+    // 1. Send RELEASE_AND_UNINSTALL command to phone via Socket.IO
+    if (target.socketId) {
+        io.to(target.socketId).emit('server_command', {
+            command: 'RELEASE_AND_UNINSTALL',
+            timestamp: Date.now()
+        });
+        console.log(`[RELEASE DISPATCHED] RELEASE_AND_UNINSTALL emitted to socket: ${target.socketId}`);
+    }
+
+    // 2. Delete from PostgreSQL Database
+    if (db.isPostgresConnected()) {
+        try {
+            await db.query('DELETE FROM devices WHERE device_id = $1 AND tenant_id = $2', [deviceId, req.user.id]);
+            await db.query(
+                `INSERT INTO audit_logs (tenant_id, device_id, event_type, ip_address, payload) VALUES ($1, $2, $3, $4, $5)`,
+                [req.user.id, deviceId, 'DEVICE_RELEASED_AND_DELETED', req.ip, JSON.stringify({ customer: target.customerName, phone: target.customerPhone })]
+            );
+            console.log(`[POSTGRESQL] Device ${deviceId} deleted from database.`);
+        } catch (e) {
+            console.error('[POSTGRESQL ERROR] Failed deleting device:', e.message);
+        }
+    }
+
+    // 3. Remove from memory and save fleet state
+    delete connectedDevices[deviceId];
+    saveFleetState();
+
+    // 4. Notify all tenant dashboard tabs
+    emitTenantDeviceUpdate(req.user.id);
+
+    res.json({
+        success: true,
+        message: 'Device release instruction dispatched. Hardware locks removed and app uninstalled.'
+    });
+});
+
 // REST: Payment Gateway Webhook (Auto-Unlock)
 app.post('/api/webhook/payment-received', (req, res) => {
     const { deviceId, status, loanId } = req.body;
