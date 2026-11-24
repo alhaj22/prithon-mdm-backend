@@ -1001,6 +1001,39 @@
                         </div>
                     `}
 
+                    <!-- Live GPS Location Tracker -->
+                    <div style="background: rgba(16, 185, 129, 0.07); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 6px; padding: 10px 14px; margin-bottom: 12px; font-size: 12px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div style="display: flex; align-items: center; gap: 6px; color: #10b981; font-weight: 700;">
+                                <span style="font-size: 14px;">📍</span>
+                                <span>Device GPS Location</span>
+                            </div>
+                            <button id="btn-gps-${escapeHtml(id)}" onclick="requestDeviceLocation('${id}')" style="background: #18181b; border: 1px solid #27272a; color: #34d399; padding: 3px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;" title="Request high-accuracy GPS fix from device">
+                                🔄 Refresh GPS
+                            </button>
+                        </div>
+                        ${(dev.latitude && dev.longitude) ? `
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+                                <div>
+                                    <div style="color: #f4f4f5; font-weight: 700; font-family: monospace; font-size: 12px;">
+                                        ${dev.latitude.toFixed(5)}°, ${dev.longitude.toFixed(5)}°
+                                    </div>
+                                    <div style="color: #94a3b8; font-size: 11px; margin-top: 2px;">
+                                        Accuracy: ±${Math.round(dev.locationAccuracy || 15)}m • <span style="color: #34d399;">Active Fix</span>
+                                    </div>
+                                </div>
+                                <a href="https://www.google.com/maps?q=${dev.latitude},${dev.longitude}" target="_blank" rel="noopener noreferrer" style="background: #059669; color: #fff; text-decoration: none; padding: 6px 12px; border-radius: 4px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.3);">
+                                    🗺️ View on Maps
+                                </a>
+                            </div>
+                        ` : `
+                            <div style="color: #94a3b8; font-size: 11px; margin-top: 6px; display: flex; justify-content: space-between; align-items: center;">
+                                <span>Awaiting coordinates from device...</span>
+                                <span style="color: #10b981; font-size: 10px; font-weight: 600;">GPS Auto-Tracking</span>
+                            </div>
+                        `}
+                    </div>
+
                     <!-- Quick Action Buttons Directly Below Device Name -->
                     <div class="device-actions-row">
                         <button class="btn-action btn-lock ${isLocked ? 'muted' : ''}" onclick="issueCommand('${id}', 'LOCK')">
@@ -1071,6 +1104,23 @@
                     alert(`📡 OFFLINE SMS LOCK:\n\nKisi bhi phone se customer ke number (${phone}) par yeh SMS bhejein:\n\n${code}`);
                 });
             }
+        }
+
+        function requestDeviceLocation(deviceId) {
+            const btn = document.getElementById(`btn-gps-${deviceId}`);
+            if (btn) {
+                btn.innerHTML = '⏳ Requesting...';
+                btn.disabled = true;
+            }
+            if (socket && socket.connected) {
+                socket.emit('request_device_location', { deviceId });
+            }
+            setTimeout(() => {
+                if (btn) {
+                    btn.innerHTML = '🔄 Refresh GPS';
+                    btn.disabled = false;
+                }
+            }, 3000);
         }
 
         async function issueCommand(deviceId, command) {

@@ -89,9 +89,11 @@ async function persistDeviceToPostgres(dev) {
             INSERT INTO devices (
                 device_id, tenant_id, tenant_code, brand, model, battery, android_version,
                 status, online, ip, last_seen, is_device_owner, customer_name, customer_phone,
-                loan_id, emi_amount, due_date, entered_imei, hardware_imei, imei_verified, imei_status, apps, updated_at
+                loan_id, emi_amount, due_date, entered_imei, hardware_imei, imei_verified, imei_status, apps,
+                latitude, longitude, location_accuracy, location_updated_at, location_address, updated_at
             ) VALUES (
-                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, NOW()
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22,
+                $23, $24, $25, $26, $27, NOW()
             )
             ON CONFLICT (device_id) DO UPDATE SET
                 tenant_id = EXCLUDED.tenant_id,
@@ -115,6 +117,11 @@ async function persistDeviceToPostgres(dev) {
                 imei_verified = EXCLUDED.imei_verified,
                 imei_status = EXCLUDED.imei_status,
                 apps = COALESCE(EXCLUDED.apps, devices.apps),
+                latitude = COALESCE(EXCLUDED.latitude, devices.latitude),
+                longitude = COALESCE(EXCLUDED.longitude, devices.longitude),
+                location_accuracy = COALESCE(EXCLUDED.location_accuracy, devices.location_accuracy),
+                location_updated_at = COALESCE(EXCLUDED.location_updated_at, devices.location_updated_at),
+                location_address = COALESCE(EXCLUDED.location_address, devices.location_address),
                 updated_at = NOW();
         `;
         await db.query(queryText, [
@@ -139,7 +146,12 @@ async function persistDeviceToPostgres(dev) {
             dev.hardwareImei || null,
             dev.imeiVerified || false,
             dev.imeiStatus || 'PENDING',
-            JSON.stringify(dev.apps || [])
+            JSON.stringify(dev.apps || []),
+            dev.latitude !== undefined && dev.latitude !== null ? dev.latitude : null,
+            dev.longitude !== undefined && dev.longitude !== null ? dev.longitude : null,
+            dev.locationAccuracy !== undefined && dev.locationAccuracy !== null ? dev.locationAccuracy : null,
+            dev.locationUpdatedAt || null,
+            dev.locationAddress || null
         ]);
     } catch (e) {
         console.error('[POSTGRESQL] Failed to persist device:', e.message);
@@ -388,7 +400,11 @@ async function processDeviceRegistration(data, socketId = null, remoteIp = null)
         emiAmount,
         dueDate,
         enteredImei,
-        hardwareImei
+        hardwareImei,
+        latitude,
+        longitude,
+        accuracy,
+        address
     } = data;
 
     if (!deviceId) return null;
@@ -456,7 +472,12 @@ async function processDeviceRegistration(data, socketId = null, remoteIp = null)
         enteredImei: cleanEnteredImei,
         hardwareImei: cleanHardwareImei,
         imeiVerified,
-        imeiStatus
+        imeiStatus,
+        latitude: latitude !== undefined && latitude !== null ? Number(latitude) : (existing.latitude ?? null),
+        longitude: longitude !== undefined && longitude !== null ? Number(longitude) : (existing.longitude ?? null),
+        locationAccuracy: accuracy !== undefined && accuracy !== null ? Number(accuracy) : (existing.locationAccuracy ?? null),
+        locationUpdatedAt: (latitude !== undefined && latitude !== null) ? new Date().toISOString() : (existing.locationUpdatedAt ?? null),
+        locationAddress: address || existing.locationAddress || null
     };
 
     saveFleetState();
@@ -666,8 +687,8 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Periodic heartbeat from phone
-    socket.on('heartbeat', ({ deviceId, battery, status, customerName, customerPhone, loanId, emiAmount, enteredImei, hardwareImei }) => {
+    // Periodic heartbeat from phone with battery, status and GPS coordinates
+    socket.on('heartbeat', ({ deviceId, battery, status, customerName, customerPhone, loanId, emiAmount, enteredImei, hardwareImei, latitude, longitude, accuracy }) => {
         if (connectedDevices[deviceId]) {
             if (battery !== undefined) connectedDevices[deviceId].battery = battery;
             if (status !== undefined) connectedDevices[deviceId].status = status;
@@ -677,12 +698,47 @@ io.on('connection', (socket) => {
             if (emiAmount) connectedDevices[deviceId].emiAmount = emiAmount;
             if (enteredImei) connectedDevices[deviceId].enteredImei = enteredImei;
             if (hardwareImei) connectedDevices[deviceId].hardwareImei = hardwareImei;
+            if (latitude !== undefined && latitude !== null) {
+                connectedDevices[deviceId].latitude = Number(latitude);
+                connectedDevices[deviceId].longitude = Number(longitude);
+                connectedDevices[deviceId].locationAccuracy = accuracy ? Number(accuracy) : null;
+                connectedDevices[deviceId].locationUpdatedAt = new Date().toISOString();
+            }
             connectedDevices[deviceId].online = true;
             connectedDevices[deviceId].socketId = socket.id;
             connectedDevices[deviceId].lastSeen = new Date().toLocaleTimeString();
+            saveFleetState();
             if (connectedDevices[deviceId].tenantId) {
                 emitTenantDeviceUpdate(connectedDevices[deviceId].tenantId);
             }
+        }
+    });
+
+    // Dedicated high-precision location update event from device
+    socket.on('device_location_updated', ({ deviceId, latitude, longitude, accuracy, address }) => {
+        if (connectedDevices[deviceId]) {
+            connectedDevices[deviceId].latitude = Number(latitude);
+            connectedDevices[deviceId].longitude = Number(longitude);
+            connectedDevices[deviceId].locationAccuracy = accuracy ? Number(accuracy) : null;
+            connectedDevices[deviceId].locationUpdatedAt = new Date().toISOString();
+            if (address) connectedDevices[deviceId].locationAddress = address;
+            connectedDevices[deviceId].online = true;
+            connectedDevices[deviceId].socketId = socket.id;
+            connectedDevices[deviceId].lastSeen = new Date().toLocaleTimeString();
+            saveFleetState();
+            console.log(`[GPS LOCATION] Device ${deviceId} -> Lat: ${latitude}, Lng: ${longitude} (±${accuracy}m)`);
+            if (connectedDevices[deviceId].tenantId) {
+                emitTenantDeviceUpdate(connectedDevices[deviceId].tenantId);
+            }
+        }
+    });
+
+    // Dashboard requests instant on-demand GPS ping
+    socket.on('request_device_location', ({ deviceId }) => {
+        const dev = connectedDevices[deviceId];
+        if (dev && dev.socketId) {
+            console.log(`[GPS REQUEST] Sending GET_LOCATION to device ${deviceId}...`);
+            io.to(dev.socketId).emit('server_command', { command: 'GET_LOCATION' });
         }
     });
 
@@ -743,7 +799,12 @@ server.listen(PORT, '0.0.0.0', async () => {
                         hardwareImei: row.hardware_imei,
                         imeiVerified: row.imei_verified,
                         imeiStatus: row.imei_status,
-                        apps: typeof row.apps === 'string' ? JSON.parse(row.apps) : (row.apps || [])
+                        apps: typeof row.apps === 'string' ? JSON.parse(row.apps) : (row.apps || []),
+                        latitude: row.latitude !== null && row.latitude !== undefined ? Number(row.latitude) : null,
+                        longitude: row.longitude !== null && row.longitude !== undefined ? Number(row.longitude) : null,
+                        locationAccuracy: row.location_accuracy !== null && row.location_accuracy !== undefined ? Number(row.location_accuracy) : null,
+                        locationUpdatedAt: row.location_updated_at ? new Date(row.location_updated_at).toISOString() : null,
+                        locationAddress: row.location_address || null
                     };
                 }
             }

@@ -82,6 +82,13 @@ async function initDatabase() {
             );
             CREATE INDEX IF NOT EXISTS idx_devices_tenant_id ON devices(tenant_id);
             CREATE INDEX IF NOT EXISTS idx_devices_entered_imei ON devices(entered_imei);
+
+            -- Auto-migration: Location tracking columns
+            ALTER TABLE devices ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION;
+            ALTER TABLE devices ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION;
+            ALTER TABLE devices ADD COLUMN IF NOT EXISTS location_accuracy REAL;
+            ALTER TABLE devices ADD COLUMN IF NOT EXISTS location_updated_at TIMESTAMPTZ;
+            ALTER TABLE devices ADD COLUMN IF NOT EXISTS location_address TEXT;
         `);
 
         // 3. Create Audit Logs Table
