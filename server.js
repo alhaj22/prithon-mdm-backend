@@ -32,6 +32,18 @@ app.get('/dashboard', (req, res) => {
     res.sendFile(path.join(__dirname, 'src', 'public', 'dashboard.html'));
 });
 
+// App Version Check API for in-app automatic updates
+app.get('/api/app-version', (req, res) => {
+    const proto = req.headers['x-forwarded-proto'] || req.protocol;
+    const baseOrigin = `${proto}://${req.get('host')}`;
+    res.json({
+        versionCode: 3,
+        versionName: "1.2.0",
+        downloadUrl: `${baseOrigin}/download/app-release.apk`,
+        releaseNotes: "Green lock screen, guided permission pop-up wizard, and automatic in-app updates"
+    });
+});
+
 // Serve APK downloads for Android Enterprise Setup Wizard
 const apkDir = path.join(__dirname, 'apk');
 if (!fs.existsSync(apkDir)) {
