@@ -136,9 +136,21 @@ async function persistDeviceToPostgres(dev) {
                 location_address = COALESCE(EXCLUDED.location_address, devices.location_address),
                 updated_at = NOW();
         `;
+        let validTenantId = dev.tenantId || null;
+        if (validTenantId) {
+            try {
+                const tCheck = await db.query('SELECT id FROM tenants WHERE id = $1', [validTenantId]);
+                if (tCheck.rows.length === 0) {
+                    validTenantId = null;
+                }
+            } catch (err) {
+                validTenantId = null;
+            }
+        }
+
         await db.query(queryText, [
             dev.deviceId,
-            dev.tenantId || null,
+            validTenantId,
             dev.tenantCode || null,
             dev.brand || 'Android',
             dev.model || 'Device',
