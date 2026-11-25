@@ -3,840 +3,1801 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Control Console | Prithon Tech MDM</title>
+    <title>Scalefusion Cockpit | Prithon Tech MDM Enterprise</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg: #ffffff;
-            --surface: #f8fafc;
-            --surface-hover: #f1f5f9;
+            --bg-canvas: #f8fafc;
+            --bg-surface: #ffffff;
+            --bg-subtle: #f1f5f9;
+            --bg-active: #e2e8f0;
             --border: #e2e8f0;
-            --text-primary: #0f172a;
+            --border-hover: #cbd5e1;
+            
+            --text-main: #0f172a;
             --text-secondary: #475569;
-            --text-tertiary: #94a3b8;
-            --danger: #dc2626;
-            --danger-hover: #b91c1c;
+            --text-muted: #94a3b8;
+            
+            --brand-primary: #0f172a;
+            --brand-accent: #2563eb;
+            --brand-accent-hover: #1d4ed8;
+            --brand-accent-subtle: #eff6ff;
+            
             --success: #16a34a;
-            --success-hover: #15803d;
-            --primary: #0f172a;
-            --primary-hover: #1e293b;
+            --success-subtle: #f0fdf4;
+            --success-border: #bbf7d0;
+            
+            --danger: #dc2626;
+            --danger-subtle: #fef2f2;
+            --danger-border: #fecaca;
+            
+            --warning: #d97706;
+            --warning-subtle: #fffbeb;
+            --warning-border: #fde68a;
+
+            --sidebar-width: 260px;
+            --header-height: 64px;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.03);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background: var(--bg);
-            color: var(--text-primary);
+            background-color: var(--bg-canvas);
+            color: var(--text-main);
             min-height: 100vh;
             display: flex;
-            flex-direction: column;
-            line-height: 1.5;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
         }
 
-        .layout {
-            max-width: 1200px;
-            width: 100%;
-            margin: 0 auto;
-            padding: 32px 24px;
-            flex: 1;
-        }
-
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid var(--border);
-            padding-bottom: 20px;
-            margin-bottom: 28px;
-        }
-
-        .header-title {
-            font-size: 16px;
-            font-weight: 600;
-            letter-spacing: -0.01em;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .header-title svg {
-            width: 20px;
-            height: 20px;
-            fill: none;
-            stroke: var(--text-primary);
-            stroke-width: 2;
-        }
-
-        .system-tag {
-            font-size: 11px;
-            font-weight: 500;
-            color: var(--text-secondary);
-            border: 1px solid var(--border);
-            padding: 2px 8px;
-            border-radius: 4px;
-            text-transform: uppercase;
-        }
-
-        .connection-indicator {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 12px;
-            color: var(--text-secondary);
-        }
-
-        .indicator-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: var(--success);
-        }
-
-        .indicator-dot.offline {
-            background: var(--danger);
-        }
-
-        /* Metric Summary Strip */
-        .metric-strip {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 16px;
-            margin-bottom: 28px;
-        }
-
-        .metric-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            padding: 16px 20px;
-        }
-
-        .metric-label {
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--text-secondary);
-            margin-bottom: 6px;
-        }
-
-        .metric-value {
-            font-size: 24px;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        /* Tabs Navigation */
-        .tab-bar {
-            display: flex;
-            gap: 8px;
-            border-bottom: 1px solid var(--border);
-            margin-bottom: 24px;
-        }
-
-        .tab-button {
-            background: none;
-            border: none;
-            border-bottom: 2px solid transparent;
-            color: var(--text-secondary);
-            font-size: 13px;
-            font-weight: 500;
-            padding: 10px 16px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .tab-button svg {
-            width: 16px;
-            height: 16px;
-            stroke: currentColor;
-            fill: none;
-            stroke-width: 2;
-        }
-
-        .tab-button:hover {
-            color: var(--text-primary);
-        }
-
-        .tab-button.active {
-            color: var(--text-primary);
-            border-bottom-color: var(--primary);
-        }
-
-        .tab-panel {
-            display: none;
-        }
-
-        .tab-panel.active {
-            display: block;
-        }
-
-        /* Fleet Grid */
-        .fleet-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-            gap: 16px;
-        }
-
-        .device-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            padding: 20px;
-        }
-
-        .device-card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 16px;
-            border-bottom: 1px solid var(--border);
-            padding-bottom: 12px;
-        }
-
-        .device-title {
-            font-size: 15px;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        .device-id {
-            font-size: 12px;
-            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-            color: var(--text-tertiary);
-            margin-top: 2px;
-        }
-
-        .badge {
-            font-size: 11px;
-            font-weight: 600;
-            padding: 3px 8px;
-            border-radius: 3px;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-        }
-
-        .badge-normal {
-            background: rgba(22, 163, 74, 0.15);
-            color: #4ade80;
-            border: 1px solid rgba(22, 163, 74, 0.3);
-        }
-
-        .badge-locked {
-            background: rgba(220, 38, 38, 0.15);
-            color: #f87171;
-            border: 1px solid rgba(220, 38, 38, 0.3);
-        }
-
-        .data-table {
-            width: 100%;
-            margin-bottom: 16px;
-            font-size: 13px;
-        }
-
-        .data-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 4px 0;
-            color: var(--text-secondary);
-        }
-
-        .data-row span:last-child {
-            color: var(--text-primary);
-            font-weight: 500;
-        }
-
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            width: 100%;
-            padding: 10px 16px;
-            border: 1px solid transparent;
-            border-radius: 4px;
-            font-size: 13px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background-color 0.15s ease;
-        }
-
-        .btn svg {
-            width: 15px;
-            height: 15px;
-            stroke: currentColor;
-            fill: none;
-            stroke-width: 2;
-        }
-
-        .btn-danger {
-            background: var(--danger);
-            color: #ffffff;
-        }
-
-        .btn-danger:hover {
-            background: var(--danger-hover);
-        }
-
-        .btn-success {
-            background: var(--success);
-            color: #ffffff;
-        }
-
-        .btn-success:hover {
-            background: var(--success-hover);
-        }
-
-        .btn-primary {
-            background: var(--primary);
-            color: #ffffff;
-        }
-
-        .btn-primary:hover {
-            background: var(--primary-hover);
-        }
-
-        .device-actions-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-top: 14px;
-            margin-bottom: 16px;
-        }
-
-        .btn-action {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-            padding: 9px 12px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: 600;
-            letter-spacing: 0.02em;
-            cursor: pointer;
-            transition: all 0.15s ease;
-            text-transform: uppercase;
-        }
-
-        .btn-action svg {
-            width: 14px;
-            height: 14px;
-            stroke: currentColor;
-            fill: none;
-            stroke-width: 2;
-        }
-
-        .btn-action:active {
-            transform: scale(0.98);
-        }
-
-        .btn-lock {
-            background: var(--danger);
-            border: 1px solid var(--danger);
-            color: #ffffff;
-        }
-
-        .btn-lock:hover {
-            background: var(--danger-hover);
-            border-color: var(--danger-hover);
-        }
-
-        .btn-lock.muted {
-            background: rgba(220, 38, 38, 0.12);
-            border: 1px solid rgba(220, 38, 38, 0.35);
-            color: #fca5a5;
-        }
-
-        .btn-lock.muted:hover {
-            background: var(--danger);
-            color: #ffffff;
-        }
-
-        .btn-unlock {
-            background: var(--success);
-            border: 1px solid var(--success);
-            color: #ffffff;
-        }
-
-        .btn-unlock:hover {
-            background: var(--success-hover);
-            border-color: var(--success-hover);
-        }
-
-        .btn-unlock.muted {
-            background: rgba(22, 163, 74, 0.12);
-            border: 1px solid rgba(22, 163, 74, 0.35);
-            color: #86efac;
-        }
-
-        .btn-unlock.muted:hover {
-            background: var(--success);
-            color: #ffffff;
-        }
-
-        /* Modal Styles */
-        .modal-backdrop {
+        /* Scalefusion Sidebar */
+        aside.sidebar {
+            width: var(--sidebar-width);
+            background: var(--bg-surface);
+            border-right: 1px solid var(--border);
+            height: 100vh;
             position: fixed;
             top: 0;
             left: 0;
-            width: 100vw;
-            height: 100vh;
-            background: rgba(0, 0, 0, 0.78);
+            display: flex;
+            flex-direction: column;
+            z-index: 100;
+        }
+
+        .brand-header {
+            padding: 20px 20px 16px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-logo-img {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .brand-titles {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .brand-name {
+            font-size: 15px;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .brand-tag {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--brand-accent);
+            background: var(--brand-accent-subtle);
+            padding: 1px 6px;
+            border-radius: 4px;
+            display: inline-block;
+            width: fit-content;
+            margin-top: 2px;
+        }
+
+        .shop-badge-container {
+            margin: 14px 16px 8px;
+            padding: 12px;
+            background: var(--bg-subtle);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+
+        .shop-code-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 2px;
+        }
+
+        .shop-code-val {
+            font-size: 16px;
+            font-weight: 800;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .shop-name-sub {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .nav-scroller {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px 10px;
+        }
+
+        .nav-group-title {
+            font-size: 10px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            padding: 12px 10px 6px;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 10px 12px;
+            border-radius: 6px;
+            color: var(--text-secondary);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            text-decoration: none;
+            margin-bottom: 2px;
+        }
+
+        .nav-item:hover {
+            background: var(--bg-subtle);
+            color: var(--text-main);
+        }
+
+        .nav-item.active {
+            background: var(--brand-primary);
+            color: #ffffff;
+        }
+
+        .nav-item.active svg {
+            stroke: #ffffff;
+        }
+
+        .nav-item svg {
+            width: 17px;
+            height: 17px;
+            stroke: var(--text-secondary);
+            fill: none;
+            stroke-width: 2;
+            flex-shrink: 0;
+            transition: stroke 0.15s ease;
+        }
+
+        .nav-badge {
+            font-size: 10.5px;
+            font-weight: 700;
+            padding: 1px 7px;
+            border-radius: 12px;
+            background: var(--bg-subtle);
+            color: var(--text-secondary);
+        }
+
+        .nav-item.active .nav-badge {
+            background: rgba(255, 255, 255, 0.2);
+            color: #ffffff;
+        }
+
+        .sidebar-footer {
+            padding: 14px 16px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--bg-surface);
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--brand-accent);
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .user-meta {
+            min-width: 0;
+        }
+
+        .user-name {
+            font-size: 12.5px;
+            font-weight: 700;
+            color: var(--text-main);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .sync-indicator-small {
+            font-size: 11px;
+            color: var(--success);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-weight: 600;
+        }
+
+        .sync-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--success);
+            animation: pulse-green 2s infinite;
+        }
+
+        .btn-logout-icon {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 6px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s ease;
+        }
+
+        .btn-logout-icon:hover {
+            color: var(--danger);
+            background: var(--danger-subtle);
+        }
+
+        /* Main Workspace Content */
+        main.workspace {
+            margin-left: var(--sidebar-width);
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        /* Top Sticky Header */
+        header.topbar {
+            height: var(--header-height);
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(8px);
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 90;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 28px;
+        }
+
+        .breadcrumbs {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .breadcrumbs span.current {
+            color: var(--text-main);
+            font-weight: 700;
+        }
+
+        .topbar-center {
+            flex: 1;
+            max-width: 480px;
+            margin: 0 24px;
+        }
+
+        .search-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .search-container svg {
+            position: absolute;
+            left: 14px;
+            width: 15px;
+            height: 15px;
+            stroke: var(--text-muted);
+            pointer-events: none;
+        }
+
+        .search-input {
+            width: 100%;
+            height: 38px;
+            background: var(--bg-subtle);
+            border: 1px solid transparent;
+            border-radius: 8px;
+            padding: 0 14px 0 38px;
+            font-size: 12.5px;
+            color: var(--text-main);
+            transition: all 0.15s ease;
+        }
+
+        .search-input:focus {
+            outline: none;
+            background: #ffffff;
+            border-color: var(--border-hover);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
+        }
+
+        .topbar-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .btn-topbar {
+            height: 36px;
+            padding: 0 14px;
+            font-size: 12.5px;
+            font-weight: 600;
+            border-radius: 6px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            text-decoration: none;
+        }
+
+        .btn-topbar-primary {
+            background: var(--brand-primary);
+            color: #ffffff;
+            border: none;
+        }
+
+        .btn-topbar-primary:hover {
+            background: #1e293b;
+        }
+
+        .btn-topbar-secondary {
+            background: #ffffff;
+            color: var(--text-main);
+            border: 1px solid var(--border);
+        }
+
+        .btn-topbar-secondary:hover {
+            background: var(--bg-subtle);
+            border-color: var(--border-hover);
+        }
+
+        /* Content Area */
+        .content-container {
+            padding: 28px;
+            flex: 1;
+        }
+
+        /* Scalefusion 4-Card Executive Metric Strip */
+        .metric-cards-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .scalefusion-metric-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 18px 20px;
+            box-shadow: var(--shadow-sm);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .scalefusion-metric-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .metric-card-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .metric-card-title {
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+        }
+
+        .metric-card-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-subtle);
+        }
+
+        .metric-card-icon svg {
+            width: 16px;
+            height: 16px;
+            stroke: var(--text-main);
+        }
+
+        .metric-big-num {
+            font-size: 30px;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            color: var(--text-main);
+            line-height: 1;
+        }
+
+        .metric-sub-detail {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-muted);
+            margin-top: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .metric-sub-detail strong {
+            color: var(--text-secondary);
+        }
+
+        /* Fleet Filter & Controls Bar */
+        .fleet-controls-bar {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 14px 18px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            box-shadow: var(--shadow-sm);
+            flex-wrap: wrap;
+        }
+
+        .filter-pills-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .filter-pill {
+            padding: 6px 14px;
+            font-size: 12px;
+            font-weight: 700;
+            border-radius: 20px;
+            background: var(--bg-subtle);
+            color: var(--text-secondary);
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .filter-pill:hover {
+            color: var(--text-main);
+            background: var(--bg-active);
+        }
+
+        .filter-pill.active {
+            background: var(--brand-primary);
+            color: #ffffff;
+            border-color: var(--brand-primary);
+        }
+
+        .view-toggles {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            background: var(--bg-subtle);
+            padding: 3px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .btn-view-toggle {
+            padding: 5px 10px;
+            border-radius: 6px;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.15s ease;
+        }
+
+        .btn-view-toggle svg {
+            width: 14px;
+            height: 14px;
+            stroke: currentColor;
+        }
+
+        .btn-view-toggle.active {
+            background: #ffffff;
+            color: var(--text-main);
+            box-shadow: var(--shadow-sm);
+        }
+
+        /* Scalefusion Fleet Table View */
+        .fleet-table-container {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            box-shadow: var(--shadow-sm);
+            overflow: hidden;
+        }
+
+        table.scalefusion-table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 13px;
+        }
+
+        table.scalefusion-table th {
+            background: var(--bg-subtle);
+            color: var(--text-secondary);
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 12px 18px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        table.scalefusion-table td {
+            padding: 14px 18px;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-main);
+            vertical-align: middle;
+        }
+
+        table.scalefusion-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        table.scalefusion-table tr:hover td {
+            background: #f8fafc;
+        }
+
+        .device-cell-main {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .device-avatar-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 8px;
+            background: var(--bg-subtle);
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .device-avatar-icon svg {
+            width: 20px;
+            height: 20px;
+            stroke: var(--brand-accent);
+        }
+
+        .device-title-wrap {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .device-brand-model {
+            font-weight: 700;
+            color: var(--text-main);
+            font-size: 13.5px;
+        }
+
+        .device-id-mono {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .customer-chip {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .customer-name-bold {
+            font-weight: 700;
+            color: var(--text-main);
+            font-size: 13px;
+        }
+
+        .customer-phone-sub {
+            font-size: 11px;
+            color: var(--brand-accent);
+            font-weight: 600;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 3px 9px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        .status-badge.normal {
+            background: var(--success-subtle);
+            color: var(--success);
+            border: 1px solid var(--success-border);
+        }
+
+        .status-badge.locked {
+            background: var(--danger-subtle);
+            color: var(--danger);
+            border: 1px solid var(--danger-border);
+        }
+
+        .status-badge.online-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        .battery-indicator-wrap {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .battery-bar-outer {
+            width: 32px;
+            height: 12px;
+            border: 1.5px solid var(--border-hover);
+            border-radius: 3px;
+            padding: 1px;
+            display: flex;
+            align-items: center;
+        }
+
+        .battery-bar-inner {
+            height: 100%;
+            border-radius: 1px;
+            background: var(--success);
+        }
+
+        /* Scalefusion Quick Actions Cell */
+        .actions-cell-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            justify-content: flex-end;
+        }
+
+        .btn-table-action {
+            height: 32px;
+            padding: 0 10px;
+            border-radius: 6px;
+            font-size: 11.5px;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.15s ease;
+            border: 1px solid var(--border);
+            background: #ffffff;
+            color: var(--text-main);
+        }
+
+        .btn-table-action svg {
+            width: 13px;
+            height: 13px;
+            stroke: currentColor;
+        }
+
+        .btn-table-action:hover {
+            background: var(--bg-subtle);
+            border-color: var(--border-hover);
+        }
+
+        .btn-table-lock {
+            background: var(--danger-subtle);
+            color: var(--danger);
+            border-color: var(--danger-border);
+        }
+
+        .btn-table-lock:hover {
+            background: #fee2e2;
+        }
+
+        .btn-table-unlock {
+            background: var(--success-subtle);
+            color: var(--success);
+            border-color: var(--success-border);
+        }
+
+        .btn-table-unlock:hover {
+            background: #dcfce7;
+        }
+
+        .btn-table-manage {
+            background: var(--brand-primary);
+            color: #ffffff;
+            border-color: var(--brand-primary);
+        }
+
+        .btn-table-manage:hover {
+            background: #1e293b;
+        }
+
+        /* Empty State */
+        .empty-fleet-hero {
+            padding: 64px 24px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .empty-icon-shield {
+            width: 56px;
+            height: 56px;
+            border-radius: 16px;
+            background: var(--brand-accent-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 16px;
+        }
+
+        .empty-icon-shield svg {
+            width: 28px;
+            height: 28px;
+            stroke: var(--brand-accent);
+        }
+
+        .empty-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 6px;
+        }
+
+        .empty-desc {
+            font-size: 13px;
+            color: var(--text-secondary);
+            max-width: 440px;
+            line-height: 1.5;
+            margin-bottom: 20px;
+        }
+
+        /* Scalefusion Deep Device Inspector Side Sheet */
+        .side-sheet-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(15, 23, 42, 0.4);
             backdrop-filter: blur(4px);
-            z-index: 9999;
+            z-index: 1000;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.25s ease;
+        }
+
+        .side-sheet-backdrop.active {
+            display: block;
+            opacity: 1;
+        }
+
+        .side-sheet-panel {
+            position: fixed;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            width: 540px;
+            max-width: 90vw;
+            background: #ffffff;
+            box-shadow: var(--shadow-xl);
+            z-index: 1001;
+            transform: translateX(100%);
+            transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .side-sheet-backdrop.active .side-sheet-panel {
+            transform: translateX(0);
+        }
+
+        .side-sheet-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .sheet-title-area {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .sheet-device-avatar {
+            width: 42px;
+            height: 42px;
+            border-radius: 10px;
+            background: var(--bg-subtle);
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .sheet-device-avatar svg {
+            width: 22px;
+            height: 22px;
+            stroke: var(--brand-accent);
+        }
+
+        .btn-close-sheet {
+            background: transparent;
+            border: none;
+            font-size: 22px;
+            cursor: pointer;
+            color: var(--text-muted);
+            border-radius: 6px;
+            padding: 4px;
+            line-height: 1;
+            transition: color 0.15s ease;
+        }
+
+        .btn-close-sheet:hover {
+            color: var(--text-main);
+        }
+
+        .sheet-action-strip {
+            padding: 12px 24px;
+            background: var(--bg-subtle);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .sheet-tabs-bar {
+            display: flex;
+            border-bottom: 1px solid var(--border);
+            padding: 0 24px;
+            background: #ffffff;
+        }
+
+        .sheet-tab-btn {
+            padding: 12px 14px;
+            font-size: 12.5px;
+            font-weight: 700;
+            color: var(--text-secondary);
+            border: none;
+            background: transparent;
+            border-bottom: 2px solid transparent;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .sheet-tab-btn:hover {
+            color: var(--text-main);
+        }
+
+        .sheet-tab-btn.active {
+            color: var(--brand-accent);
+            border-bottom-color: var(--brand-accent);
+        }
+
+        .sheet-content-scroll {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+        }
+
+        .sheet-section {
+            margin-bottom: 24px;
+        }
+
+        .sheet-section-title {
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+
+        .sheet-data-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .sheet-data-item {
+            background: var(--bg-canvas);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 14px;
+        }
+
+        .sheet-data-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+
+        .sheet-data-val {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-main);
+            word-break: break-all;
+        }
+
+        /* Scalefusion Provisioning & Settings Panels */
+        .workspace-panel {
+            display: none;
+        }
+
+        .workspace-panel.active {
+            display: block;
+        }
+
+        .card-panel-box {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: var(--shadow-sm);
+            max-width: 720px;
+            margin: 0 auto;
+        }
+
+        .card-panel-title {
+            font-size: 17px;
+            font-weight: 800;
+            color: var(--text-main);
+            margin-bottom: 6px;
+        }
+
+        .card-panel-desc {
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            margin-bottom: 20px;
+        }
+
+        .input-box-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+        .scalefusion-input {
+            width: 100%;
+            height: 44px;
+            background: var(--bg-canvas);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0 14px;
+            font-size: 13.5px;
+            color: var(--text-main);
+            transition: all 0.15s ease;
+        }
+
+        .scalefusion-input:focus {
+            outline: none;
+            background: #ffffff;
+            border-color: var(--brand-accent);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        /* Scalefusion Policy Restriction Toggles */
+        .policy-toggle-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .policy-toggle-row:last-child {
+            border-bottom: none;
+        }
+
+        .policy-info-area {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            padding-right: 16px;
+        }
+
+        .policy-title {
+            font-size: 13.5px;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .policy-desc {
+            font-size: 12px;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        .switch-toggle {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+
+        .switch-toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider-round {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: var(--border-hover);
+            transition: .2s;
+            border-radius: 24px;
+        }
+
+        .slider-round:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .2s;
+            border-radius: 50%;
+            box-shadow: var(--shadow-sm);
+        }
+
+        input:checked + .slider-round {
+            background-color: var(--brand-accent);
+        }
+
+        input:checked + .slider-round:before {
+            transform: translateX(20px);
+        }
+
+        /* Pulse Animation */
+        @keyframes pulse-green {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(22, 163, 74, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(22, 163, 74, 0); }
+        }
+
+        /* Modal Backdrop */
+        .modal-backdrop {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(15, 23, 42, 0.5);
+            backdrop-filter: blur(4px);
+            z-index: 2000;
             display: flex;
             align-items: center;
             justify-content: center;
             padding: 20px;
         }
 
-        .modal-container {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 8px;
+        .modal-box {
+            background: #ffffff;
+            border-radius: 12px;
             width: 100%;
-            max-width: 820px;
+            max-width: 760px;
             max-height: 85vh;
             display: flex;
             flex-direction: column;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.15);
+            box-shadow: var(--shadow-xl);
+            overflow: hidden;
         }
 
-        .modal-header {
-            padding: 16px 20px;
+        .modal-box-header {
+            padding: 18px 24px;
             border-bottom: 1px solid var(--border);
             display: flex;
+            align-items: center;
             justify-content: space-between;
-            align-items: center;
         }
 
-        .modal-title {
-            font-size: 16px;
-            font-weight: 700;
-            color: var(--text-primary);
-        }
-
-        .modal-subtitle {
-            font-size: 12px;
-            color: var(--text-secondary);
-            margin-top: 2px;
-        }
-
-        .btn-close-modal {
-            background: transparent;
-            border: none;
-            color: var(--text-secondary);
-            font-size: 24px;
-            cursor: pointer;
-            line-height: 1;
-            padding: 4px;
-        }
-
-        .btn-close-modal:hover {
-            color: var(--text-primary);
-        }
-
-        .btn-refresh-apps {
-            background: rgba(37, 99, 235, 0.1);
-            border: 1px solid rgba(37, 99, 235, 0.35);
-            color: #2563eb;
-            border-radius: 4px;
-            padding: 6px 12px;
-            font-size: 11px;
-            font-weight: 600;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .btn-refresh-apps svg {
-            width: 12px;
-            height: 12px;
-            stroke: currentColor;
-            fill: none;
-            stroke-width: 2;
-        }
-
-        .modal-search-bar {
-            padding: 12px 20px;
-            background: var(--bg);
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-            align-items: center;
-        }
-
-        .modal-search-bar .input-field {
-            flex: 1;
-            min-width: 220px;
-            height: 38px;
-            font-size: 13px;
-        }
-
-        .app-filter-tabs {
-            display: flex;
-            gap: 4px;
-        }
-
-        .filter-btn {
-            background: var(--surface-hover);
-            border: 1px solid var(--border);
-            color: var(--text-secondary);
-            border-radius: 4px;
-            padding: 6px 12px;
-            font-size: 12px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.15s ease;
-        }
-
-        .filter-btn.active {
-            background: #0f172a;
-            color: #ffffff;
-            border-color: #0f172a;
-        }
-
-        .apps-grid {
-            padding: 16px 20px;
+        .apps-inventory-list {
+            padding: 16px 24px;
             overflow-y: auto;
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
             gap: 10px;
         }
 
-        .app-item {
-            background: var(--bg);
+        .app-entry-card {
+            background: var(--bg-canvas);
             border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 10px 12px;
+            border-radius: 8px;
+            padding: 10px 14px;
             display: flex;
             align-items: center;
             gap: 12px;
-            transition: border-color 0.15s ease;
         }
 
-        .app-item:hover {
-            border-color: #cbd5e1;
-        }
-
-        .app-item img {
-            width: 44px;
-            height: 44px;
-            border-radius: 10px;
+        .app-entry-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
             object-fit: contain;
-            background: var(--surface);
+            background: #ffffff;
             border: 1px solid var(--border);
             padding: 2px;
-            flex-shrink: 0;
-        }
-
-        .app-item-info {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .app-item-name {
-            font-size: 13px;
-            font-weight: 700;
-            color: var(--text-primary);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .app-item-pkg {
-            font-size: 11px;
-            color: var(--text-tertiary);
-            font-family: monospace;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            margin-top: 2px;
-        }
-
-        .app-item-version {
-            font-size: 10px;
-            color: var(--text-secondary);
-            margin-top: 2px;
-        }
-
-        .empty-state {
-            border: 1px dashed var(--border);
-            border-radius: 4px;
-            padding: 48px 24px;
-            text-align: center;
-            color: var(--text-secondary);
-            font-size: 13px;
-        }
-
-        /* Provisioning Section */
-        .panel-box {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            padding: 24px;
-            max-width: 640px;
-            margin: 0 auto;
-        }
-
-        .panel-title {
-            font-size: 16px;
-            font-weight: 600;
-            margin-bottom: 6px;
-        }
-
-        .panel-desc {
-            font-size: 13px;
-            color: var(--text-secondary);
-            margin-bottom: 20px;
-        }
-
-        .form-group {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin-bottom: 16px;
-        }
-
-        .input-field {
-            width: 100%;
-            padding: 10px 12px;
-            background: var(--bg);
-            border: 1px solid var(--border);
-            color: var(--text-primary);
-            border-radius: 4px;
-            font-size: 13px;
-        }
-
-        .input-field:focus {
-            outline: none;
-            border-color: var(--primary);
-        }
-
-        .qr-output-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin: 24px 0;
-        }
-
-        .qr-card {
-            background: #ffffff;
-            padding: 16px;
-            border-radius: 4px;
-            display: inline-block;
-        }
-
-        .step-list {
-            margin-top: 20px;
-            border-top: 1px solid var(--border);
-            padding-top: 16px;
-            font-size: 13px;
-            color: var(--text-secondary);
-        }
-
-        .step-list ol {
-            padding-left: 20px;
-            margin-top: 8px;
-        }
-
-        .step-list li {
-            margin-bottom: 6px;
-        }
-
-        footer {
-            border-top: 1px solid var(--border);
-            padding: 20px 24px;
-            font-size: 12px;
-            color: var(--text-tertiary);
-            display: flex;
-            justify-content: space-between;
-            max-width: 1200px;
-            width: 100%;
-            margin: 0 auto;
-        }
-
-        footer a {
-            color: var(--text-secondary);
-            text-decoration: none;
-            margin-left: 16px;
-        }
-
-        footer a:hover {
-            color: var(--text-primary);
-            text-decoration: underline;
         }
     </style>
 </head>
 <body>
 
-    <div class="layout">
-        <header>
-            <div class="header-title">
-                <img src="/favicon.svg" style="width: 26px; height: 26px; border-radius: 6px;" alt="Prithon Logo">
-                <span id="tenant-shop-name">Prithon Tech</span>
-                <span class="system-tag" id="tenant-code-tag">MDM Fleet Console</span>
+    <!-- Scalefusion Left Sidebar -->
+    <aside class="sidebar">
+        <div class="brand-header">
+            <img src="/favicon.svg" class="brand-logo-img" alt="Prithon Logo">
+            <div class="brand-titles">
+                <span class="brand-name">Prithon MDM</span>
+                <span class="brand-tag">Enterprise SaaS</span>
             </div>
-            <div style="display: flex; gap: 14px; align-items: center;">
-                <div class="connection-indicator">
-                    <span class="indicator-dot" id="socket-dot"></span>
-                    <span id="socket-status-text">Connected</span>
+        </div>
+
+        <div class="shop-badge-container">
+            <div class="shop-code-label">Retailer Tenant Shop</div>
+            <div class="shop-code-val">
+                <span id="display-tenant-code">...</span>
+                <span style="font-size: 11px; color: var(--success); font-weight: 700;">● Active</span>
+            </div>
+            <div class="shop-name-sub" id="tenant-shop-name">Loading Account...</div>
+        </div>
+
+        <div class="nav-scroller">
+            <div class="nav-group-title">Fleet Command</div>
+            <a class="nav-item active" href="javascript:void(0)" onclick="switchWorkspacePanel('panel-fleet', this)">
+                <span style="display:flex; align-items:center; gap:10px;">
+                    <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                    <span>Fleet Cockpit</span>
+                </span>
+                <span class="nav-badge" id="nav-count-fleet">0</span>
+            </a>
+            <a class="nav-item" href="javascript:void(0)" onclick="switchWorkspacePanel('panel-map', this)">
+                <span style="display:flex; align-items:center; gap:10px;">
+                    <svg viewBox="0 0 24 24"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+                    <span>Live GPS &amp; Geofence</span>
+                </span>
+            </a>
+            <a class="nav-item" href="javascript:void(0)" onclick="switchWorkspacePanel('panel-financing', this)">
+                <span style="display:flex; align-items:center; gap:10px;">
+                    <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                    <span>EMI &amp; Repayments</span>
+                </span>
+            </a>
+
+            <div class="nav-group-title">Security &amp; Policies</div>
+            <a class="nav-item" href="javascript:void(0)" onclick="switchWorkspacePanel('panel-provisioning', this)">
+                <span style="display:flex; align-items:center; gap:10px;">
+                    <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="7" y="7" width="3" height="3"/><rect x="14" y="7" width="3" height="3"/><rect x="7" y="14" width="3" height="3"/><rect x="14" y="14" width="3" height="3"/></svg>
+                    <span>6-Tap QR Station</span>
+                </span>
+            </a>
+            <a class="nav-item" href="javascript:void(0)" onclick="switchWorkspacePanel('panel-policies', this)">
+                <span style="display:flex; align-items:center; gap:10px;">
+                    <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    <span>Kiosk Security Rules</span>
+                </span>
+            </a>
+            <a class="nav-item" href="javascript:void(0)" onclick="switchWorkspacePanel('panel-sms', this)">
+                <span style="display:flex; align-items:center; gap:10px;">
+                    <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    <span>0-KB Silent SMS Hub</span>
+                </span>
+            </a>
+            <a class="nav-item" href="javascript:void(0)" onclick="switchWorkspacePanel('panel-webhooks', this)">
+                <span style="display:flex; align-items:center; gap:10px;">
+                    <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                    <span>Settlement Webhook</span>
+                </span>
+            </a>
+        </div>
+
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <div class="user-avatar" id="avatar-initial">A</div>
+                <div class="user-meta">
+                    <div class="user-name" id="user-display-name">Admin Portal</div>
+                    <div class="sync-indicator-small">
+                        <span class="sync-dot" id="socket-dot"></span>
+                        <span id="socket-status-text">Connected</span>
+                    </div>
                 </div>
-                <button id="btn-logout" style="background: var(--surface-hover); border: 1px solid var(--border); color: var(--danger); font-size: 11.5px; font-weight: 600; padding: 6px 12px; border-radius: 4px; cursor: pointer;">
-                    Sign Out
+            </div>
+            <button class="btn-logout-icon" id="btn-logout" title="Sign Out">
+                <svg style="width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 2;" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            </button>
+        </div>
+    </aside>
+
+    <!-- Workspace Main Container -->
+    <main class="workspace">
+        <!-- Top Navigation Header -->
+        <header class="topbar">
+            <div class="breadcrumbs">
+                <span>Console</span>
+                <span>/</span>
+                <span class="current" id="topbar-current-view">Fleet Cockpit</span>
+            </div>
+
+            <div class="topbar-center">
+                <div class="search-container">
+                    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <input type="text" id="global-device-search" class="search-input" placeholder="Search by IMEI, Customer Name, Phone, Loan ID, Model..." oninput="handleGlobalSearch(this.value)">
+                </div>
+            </div>
+
+            <div class="topbar-actions">
+                <button class="btn-topbar btn-topbar-secondary" onclick="refreshFleetData()">
+                    <svg style="width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2;" viewBox="0 0 24 24"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                    <span>Sync Telemetry</span>
+                </button>
+                <button class="btn-topbar btn-topbar-primary" onclick="switchWorkspacePanel('panel-provisioning')">
+                    <svg style="width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2.5;" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    <span>+ Enroll Device (QR)</span>
                 </button>
             </div>
         </header>
 
-        <!-- Live Metric Summary -->
-        <div class="metric-strip">
-            <div class="metric-card">
-                <div class="metric-label">Active Connected Devices</div>
-                <div class="metric-value" id="metric-total">0</div>
-            </div>
-            <div class="metric-card">
-                <div class="metric-label">Normal Status Devices</div>
-                <div class="metric-value" id="metric-normal">0</div>
-            </div>
-            <div class="metric-card">
-                <div class="metric-label">Restricted / Locked Devices</div>
-                <div class="metric-value" id="metric-locked">0</div>
-            </div>
-        </div>
+        <!-- Content Area -->
+        <div class="content-container">
 
-        <!-- Navigation Tabs -->
-        <div class="tab-bar">
-            <button class="tab-button active" onclick="switchTab('tab-fleet')">
-                <svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
-                Fleet Overview
-            </button>
-            <button class="tab-button" onclick="switchTab('tab-provisioning')">
-                <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-                Device Provisioning
-            </button>
-            <button class="tab-button" onclick="switchTab('tab-webhooks')">
-                <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-                Payment Settlement Dispatch
-            </button>
-        </div>
+            <!-- 1. FLEET COCKPIT PANEL (PRIMARY) -->
+            <section id="panel-fleet" class="workspace-panel active">
+                
+                <!-- Scalefusion 4-Card Executive Metric Strip -->
+                <div class="metric-cards-grid">
+                    <div class="scalefusion-metric-card">
+                        <div class="metric-card-top">
+                            <span class="metric-card-title">Total Managed Fleet</span>
+                            <div class="metric-card-icon">
+                                <svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                            </div>
+                        </div>
+                        <div class="metric-big-num" id="metric-total">0</div>
+                        <div class="metric-sub-detail">
+                            <span id="metric-do-count">0</span> Device Owner Armed
+                        </div>
+                    </div>
 
-        <!-- TAB 1: FLEET OVERVIEW -->
-        <div id="tab-fleet" class="tab-panel active">
-            <div class="fleet-grid" id="fleet-list">
-                <div class="empty-state" style="grid-column: 1 / -1;">
-                    No active hardware clients connected. Complete device enrollment to monitor telemetry.
-                </div>
-            </div>
-        </div>
+                    <div class="scalefusion-metric-card">
+                        <div class="metric-card-top">
+                            <span class="metric-card-title">Real-Time Online</span>
+                            <div class="metric-card-icon" style="background: var(--success-subtle);">
+                                <svg viewBox="0 0 24 24" style="stroke: var(--success);"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
+                            </div>
+                        </div>
+                        <div class="metric-big-num" id="metric-online" style="color: var(--success);">0</div>
+                        <div class="metric-sub-detail">
+                            Sub-second WebSocket Active
+                        </div>
+                    </div>
 
-        <!-- TAB 2: PROVISIONING -->
-        <div id="tab-provisioning" class="tab-panel">
-            <div class="panel-box">
-                <div class="panel-title">Your Unique Shop Enrollment QR &amp; Code</div>
-                <div class="panel-desc">
-                    Every device provisioned with this barcode or using your Shop Code will be permanently and exclusively linked to your shop account.
-                </div>
+                    <div class="scalefusion-metric-card">
+                        <div class="metric-card-top">
+                            <span class="metric-card-title">Kiosk Locked (Default)</span>
+                            <div class="metric-card-icon" style="background: var(--danger-subtle);">
+                                <svg viewBox="0 0 24 24" style="stroke: var(--danger);"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                            </div>
+                        </div>
+                        <div class="metric-big-num" id="metric-locked" style="color: var(--danger);">0</div>
+                        <div class="metric-sub-detail">
+                            Overdue Repayments Protected
+                        </div>
+                    </div>
 
-                <div style="background: rgba(0, 229, 255, 0.08); border: 1px solid rgba(0, 229, 255, 0.25); border-radius: 8px; padding: 14px 18px; margin-bottom: 20px;">
-                    <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; margin-bottom: 4px;">Your Assigned Shop Code</div>
-                    <div style="font-size: 26px; font-weight: 800; color: #00E5FF; font-family: 'JetBrains Mono', monospace;" id="display-tenant-code">LOADING...</div>
-                    <div style="font-size: 12px; color: #cbd5e1; margin-top: 4px;">
-                        When installing the APK directly on a customer's phone, enter this 6-digit Shop Code to pair the device instantly with your dashboard.
+                    <div class="scalefusion-metric-card">
+                        <div class="metric-card-top">
+                            <span class="metric-card-title">Normal / Repaying</span>
+                            <div class="metric-card-icon">
+                                <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                            </div>
+                        </div>
+                        <div class="metric-big-num" id="metric-normal">0</div>
+                        <div class="metric-sub-detail">
+                            100% Policy Compliant
+                        </div>
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <input type="text" id="wifi-ssid" class="input-field" placeholder="Wi-Fi SSID (Optional)" value="">
-                    <input type="password" id="wifi-pass" class="input-field" placeholder="Wi-Fi Password (Optional)" value="">
+                <!-- Scalefusion Fleet Controls Filter Bar -->
+                <div class="fleet-controls-bar">
+                    <div class="filter-pills-group">
+                        <button class="filter-pill active" onclick="setFleetFilter('all', this)">All Fleet (<span id="pill-count-all">0</span>)</button>
+                        <button class="filter-pill" onclick="setFleetFilter('online', this)">🟢 Online (<span id="pill-count-online">0</span>)</button>
+                        <button class="filter-pill" onclick="setFleetFilter('locked', this)">🔴 Kiosk Locked (<span id="pill-count-locked">0</span>)</button>
+                        <button class="filter-pill" onclick="setFleetFilter('normal', this)">Unlocked (<span id="pill-count-normal">0</span>)</button>
+                        <button class="filter-pill" onclick="setFleetFilter('offline', this)">Offline (<span id="pill-count-offline">0</span>)</button>
+                    </div>
+
+                    <div class="view-toggles">
+                        <button class="btn-view-toggle active" id="btn-view-table" onclick="setFleetViewMode('table')">
+                            <svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                            <span>Table</span>
+                        </button>
+                        <button class="btn-view-toggle" id="btn-view-grid" onclick="setFleetViewMode('grid')">
+                            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                            <span>Cards</span>
+                        </button>
+                    </div>
                 </div>
 
-                <button class="btn btn-primary" onclick="generateEnrollmentQr()">
-                    Generate Authenticated Provisioning QR
-                </button>
-
-                <div class="qr-output-container">
-                    <div class="qr-card" id="qr-target"></div>
+                <!-- Scalefusion Fleet Table Container -->
+                <div class="fleet-table-container" id="fleet-table-wrapper">
+                    <table class="scalefusion-table">
+                        <thead>
+                            <tr>
+                                <th>Device &amp; Model</th>
+                                <th>Hardware IMEI / Identity</th>
+                                <th>Customer &amp; Loan KYC</th>
+                                <th>Battery &amp; Telemetry</th>
+                                <th>Live GPS Status</th>
+                                <th>Security State</th>
+                                <th style="text-align: right;">Quick Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="scalefusion-table-body">
+                            <!-- Populated dynamically via renderDeviceList() -->
+                        </tbody>
+                    </table>
                 </div>
 
-                <div class="step-list">
-                    <strong>Enrollment Instructions:</strong>
-                    <ol>
-                        <li>Power on unboxed or factory-reset hardware to the standard setup welcome view.</li>
-                        <li>Tap repeatedly on blank screen space six times to initialize the internal vision scanner.</li>
-                        <li>Align camera with this barcode. The device downloads the agent, validates the SHA-256 integrity hash, and establishes Device Owner status.</li>
-                    </ol>
+                <!-- Visual Grid View Container (Hidden by default) -->
+                <div id="fleet-grid-wrapper" style="display: none; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px;">
+                    <!-- Populated dynamically -->
                 </div>
-            </div>
+
+            </section>
+
+            <!-- 2. LIVE GPS & GEOFENCE RADAR PANEL -->
+            <section id="panel-map" class="workspace-panel">
+                <div style="background:#ffffff; border:1px solid var(--border); border-radius:12px; padding:24px; box-shadow:var(--shadow-sm);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
+                        <div>
+                            <div class="card-panel-title">Geospatial Security &amp; Live Tracking Radar</div>
+                            <div class="card-panel-desc" style="margin-bottom:0;">Real-time high-accuracy GPS coordinates emitted by managed devices via continuous satellite fix.</div>
+                        </div>
+                        <button class="btn-topbar btn-topbar-secondary" onclick="refreshFleetData()">
+                            <span>🔄 Sync Locations</span>
+                        </button>
+                    </div>
+
+                    <div id="live-map-fleet-list" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(360px, 1fr)); gap:16px;">
+                        <!-- Dynamic GPS Cards -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- 3. EMI & FINANCING REPAYMENTS PANEL -->
+            <section id="panel-financing" class="workspace-panel">
+                <div class="card-panel-box">
+                    <div class="card-panel-title">Financing &amp; Loan Ledger Directory</div>
+                    <div class="card-panel-desc">
+                        Manage micro-lending contracts, monthly repayment installments, overdue dunning cycles, and automated recovery locks.
+                    </div>
+                    <div id="financing-ledger-list">
+                        <!-- Dynamic Ledger Rows -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- 4. 6-TAP ZERO-TOUCH PROVISIONING STATION -->
+            <section id="panel-provisioning" class="workspace-panel">
+                <div class="card-panel-box">
+                    <div class="card-panel-title">Scalefusion 6-Tap QR Provisioning Station</div>
+                    <div class="card-panel-desc">
+                        Every device provisioned with this barcode or using your Shop Code will be permanently and exclusively enrolled into your shop fleet as a high-security Device Owner.
+                    </div>
+
+                    <div style="background: var(--brand-accent-subtle); border: 1px solid rgba(37,99,235,0.2); border-radius: 8px; padding: 14px 18px; margin-bottom: 20px;">
+                        <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 4px;">Assigned Retailer Shop Code</div>
+                        <div style="font-size: 26px; font-weight: 800; color: var(--brand-accent); font-family: 'JetBrains Mono', monospace;" id="display-tenant-code-qr">LOADING...</div>
+                        <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">
+                            Enter this code in the app during registration or scan the QR code during fresh setup.
+                        </div>
+                    </div>
+
+                    <div class="input-box-group">
+                        <input type="text" id="wifi-ssid" class="scalefusion-input" placeholder="Wi-Fi SSID (Optional for automatic connection)">
+                        <input type="password" id="wifi-pass" class="scalefusion-input" placeholder="Wi-Fi Password (Optional)">
+                    </div>
+
+                    <button class="btn-topbar btn-topbar-primary" style="width: 100%; height: 44px; justify-content: center; font-size: 13.5px;" onclick="generateEnrollmentQr()">
+                        <span>Generate Authenticated Provisioning QR</span>
+                    </button>
+
+                    <div style="display:flex; justify-content:center; margin: 24px 0;">
+                        <div style="background:#ffffff; padding:16px; border:1px solid var(--border); border-radius:12px; box-shadow:var(--shadow-sm);" id="qr-target"></div>
+                    </div>
+
+                    <div style="border-top: 1px solid var(--border); padding-top: 16px; font-size: 12.5px; color: var(--text-secondary); line-height: 1.6;">
+                        <strong>6-Tap Setup Instructions:</strong>
+                        <ol style="margin-left: 20px; margin-top: 6px;">
+                            <li>Power on unboxed or factory-reset phone on the standard welcome screen.</li>
+                            <li>Tap repeatedly on blank screen space <strong>6 times</strong> to activate camera QR scanner.</li>
+                            <li>Scan this QR code. The device downloads the agent, verifies SHA-256 hash, and establishes Device Owner status.</li>
+                        </ol>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 5. KIOSK RESTRICTIONS & POLICY WORKSPACE -->
+            <section id="panel-policies" class="workspace-panel">
+                <div class="card-panel-box">
+                    <div class="card-panel-title">Hardware Kiosk Lockdown Policies</div>
+                    <div class="card-panel-desc">
+                        Configure deep OS-level security restrictions enforced continuously by the Device Owner DPC engine.
+                    </div>
+
+                    <div class="policy-toggle-row">
+                        <div class="policy-info-area">
+                            <span class="policy-title">🛡️ Anti-Power-Off Protection</span>
+                            <span class="policy-desc">Blocks power menu, shutdown dialogs, restart attempts, and power button holding when device is locked.</span>
+                        </div>
+                        <label class="switch-toggle">
+                            <input type="checkbox" checked disabled>
+                            <span class="slider-round"></span>
+                        </label>
+                    </div>
+
+                    <div class="policy-toggle-row">
+                        <div class="policy-info-area">
+                            <span class="policy-title">🔒 Hardware USB &amp; ADB Lockdown</span>
+                            <span class="policy-desc">Prevents USB data transfer, MTP connections, and bypass attempts via PC cables when locked.</span>
+                        </div>
+                        <label class="switch-toggle">
+                            <input type="checkbox" checked disabled>
+                            <span class="slider-round"></span>
+                        </label>
+                    </div>
+
+                    <div class="policy-toggle-row">
+                        <div class="policy-info-area">
+                            <span class="policy-title">🚫 Factory Reset Protection (FRP)</span>
+                            <span class="policy-desc">Disables Settings recovery menu and hardware key combinations to prevent wiping financed hardware.</span>
+                        </div>
+                        <label class="switch-toggle">
+                            <input type="checkbox" checked disabled>
+                            <span class="slider-round"></span>
+                        </label>
+                    </div>
+
+                    <div class="policy-toggle-row">
+                        <div class="policy-info-area">
+                            <span class="policy-title">📲 Status Bar &amp; Quick Settings Blocker</span>
+                            <span class="policy-desc">Suppresses notification drawer pull-down, airplane mode toggle, and Wi-Fi disconnect attempts.</span>
+                        </div>
+                        <label class="switch-toggle">
+                            <input type="checkbox" checked disabled>
+                            <span class="slider-round"></span>
+                        </label>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 6. 0-KB SILENT SMS GATEWAY PANEL -->
+            <section id="panel-sms" class="workspace-panel">
+                <div class="card-panel-box">
+                    <div class="card-panel-title">0-KB Silent SMS Offline Gateway</div>
+                    <div class="card-panel-desc">
+                        Trigger emergency lock or unlock instructions via encrypted cellular SMS when the borrower turns off mobile data and Wi-Fi.
+                    </div>
+
+                    <div style="background: var(--warning-subtle); border: 1px solid var(--warning-border); border-radius: 8px; padding: 14px 18px; margin-bottom: 18px;">
+                        <div style="font-size: 12px; font-weight: 700; color: var(--warning); margin-bottom: 2px;">Offline SMS Protocol Format:</div>
+                        <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-main); margin-top: 4px;">
+                            LOCK: <span style="color: var(--danger); font-weight: 700;">#PRITHON:LOCK:&lt;LOAN_ID&gt;#</span><br>
+                            UNLOCK: <span style="color: var(--success); font-weight: 700;">#PRITHON:UNLOCK:&lt;LOAN_ID&gt;#</span>
+                        </div>
+                    </div>
+
+                    <div class="input-box-group">
+                        <input type="text" id="sms-target-phone" class="scalefusion-input" placeholder="Customer Mobile Number (e.g. 9876543210)">
+                        <input type="text" id="sms-target-loan" class="scalefusion-input" placeholder="Loan ID (e.g. LN-1024)">
+                    </div>
+
+                    <div style="display:flex; gap:10px;">
+                        <button class="btn-topbar btn-topbar-primary" style="flex:1; height:42px; justify-content:center;" onclick="dispatchManualSms('LOCK')">
+                            <span>Send Offline Lock SMS</span>
+                        </button>
+                        <button class="btn-topbar btn-topbar-secondary" style="flex:1; height:42px; justify-content:center;" onclick="dispatchManualSms('UNLOCK')">
+                            <span>Send Offline Unlock SMS</span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 7. PAYMENT SETTLEMENT WEBHOOK PANEL -->
+            <section id="panel-webhooks" class="workspace-panel">
+                <div class="card-panel-box">
+                    <div class="card-panel-title">Automated Payment Settlement Webhook</div>
+                    <div class="card-panel-desc">
+                        Simulate incoming payment verification from authorized payment gateway partners (Razorpay, BharatQR, BBPS). Upon confirmation, the backend transmits an immediate unlock instruction.
+                    </div>
+
+                    <div class="input-box-group">
+                        <input type="text" id="sim-id" class="scalefusion-input" placeholder="Target Device ID or Loan ID">
+                    </div>
+
+                    <button class="btn-topbar btn-topbar-primary" style="width: 100%; height: 42px; justify-content: center; background: var(--success); border-color: var(--success);" onclick="dispatchPaymentWebhook()">
+                        <span>Dispatch Settlement Unlock Verification</span>
+                    </button>
+                </div>
+            </section>
+
         </div>
+    </main>
 
-        <!-- TAB 3: PAYMENT SETTLEMENT DISPATCH -->
-        <div id="tab-webhooks" class="tab-panel">
-            <div class="panel-box">
-                <div class="panel-title">Automated Payment Settlement Webhook</div>
-                <div class="panel-desc">
-                    Simulate incoming payment verification from authorized payment gateway partners (e.g., Razorpay, Cashfree, BBPS). Upon confirmation, the backend transmits an immediate unlock instruction.
+    <!-- Scalefusion Deep Device Inspector Side Sheet -->
+    <div class="side-sheet-backdrop" id="device-inspector-backdrop" onclick="closeDeviceInspector()">
+        <div class="side-sheet-panel" onclick="event.stopPropagation()">
+            <div class="side-sheet-header">
+                <div class="sheet-title-area">
+                    <div class="sheet-device-avatar">
+                        <svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                    </div>
+                    <div>
+                        <div style="font-size: 15px; font-weight: 800; color: var(--text-main);" id="sheet-device-name">Device Details</div>
+                        <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted);" id="sheet-device-id">ID: ...</div>
+                    </div>
                 </div>
+                <button class="btn-close-sheet" onclick="closeDeviceInspector()">&times;</button>
+            </div>
 
-                <div style="margin-bottom: 16px;">
-                    <input type="text" id="sim-id" class="input-field" placeholder="Target Device ID">
-                </div>
-
-                <button class="btn btn-success" onclick="dispatchPaymentWebhook()">
-                    <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-                    Dispatch Settlement Unlock Verification
+            <!-- Quick Action Command Strip -->
+            <div class="sheet-action-strip">
+                <button class="btn-table-action btn-table-lock" id="sheet-btn-lock" onclick="triggerSheetCommand('LOCK')">
+                    <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    <span>Remote Lock</span>
                 </button>
+                <button class="btn-table-action btn-table-unlock" id="sheet-btn-unlock" onclick="triggerSheetCommand('UNLOCK')">
+                    <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
+                    <span>Remote Unlock</span>
+                </button>
+                <button class="btn-table-action" onclick="triggerSheetCommand('REFRESH_LOCATION')">
+                    <svg viewBox="0 0 24 24"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/></svg>
+                    <span>GPS Fix</span>
+                </button>
+                <button class="btn-table-action" onclick="triggerSheetCommand('REFRESH_APPS')">
+                    <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                    <span>Sync Apps</span>
+                </button>
+                <button class="btn-table-action" style="color: var(--danger); border-color: var(--danger-border); background: var(--danger-subtle);" onclick="triggerSheetRelease()">
+                    <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                    <span>Release</span>
+                </button>
+            </div>
+
+            <div class="sheet-tabs-bar">
+                <button class="sheet-tab-btn active" onclick="switchSheetTab('sheet-tab-overview', this)">Overview</button>
+                <button class="sheet-tab-btn" onclick="switchSheetTab('sheet-tab-kyc', this)">Loan &amp; KYC</button>
+                <button class="sheet-tab-btn" onclick="switchSheetTab('sheet-tab-location', this)">GPS Location</button>
+                <button class="sheet-tab-btn" onclick="switchSheetTab('sheet-tab-apps', this)">Apps Inventory</button>
+            </div>
+
+            <div class="sheet-content-scroll">
+                <!-- Sheet Tab 1: Overview -->
+                <div id="sheet-tab-overview" class="sheet-tab-content">
+                    <div class="sheet-section">
+                        <div class="sheet-section-title">Hardware Telemetry</div>
+                        <div class="sheet-data-grid">
+                            <div class="sheet-data-item">
+                                <div class="sheet-data-label">Hardware IMEI</div>
+                                <div class="sheet-data-val" id="sheet-imei">...</div>
+                            </div>
+                            <div class="sheet-data-item">
+                                <div class="sheet-data-label">Android OS Version</div>
+                                <div class="sheet-data-val" id="sheet-os">...</div>
+                            </div>
+                            <div class="sheet-data-item">
+                                <div class="sheet-data-label">Battery Level</div>
+                                <div class="sheet-data-val" id="sheet-battery">...</div>
+                            </div>
+                            <div class="sheet-data-item">
+                                <div class="sheet-data-label">Device Owner Mode</div>
+                                <div class="sheet-data-val" id="sheet-do-state">...</div>
+                            </div>
+                            <div class="sheet-data-item">
+                                <div class="sheet-data-label">Last Seen / Heartbeat</div>
+                                <div class="sheet-data-val" id="sheet-last-seen">...</div>
+                            </div>
+                            <div class="sheet-data-item">
+                                <div class="sheet-data-label">Current Security Status</div>
+                                <div class="sheet-data-val" id="sheet-status">...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sheet Tab 2: Loan & KYC -->
+                <div id="sheet-tab-kyc" class="sheet-tab-content" style="display:none;">
+                    <div class="sheet-section">
+                        <div class="sheet-section-title">Customer &amp; Finance Profile</div>
+                        <div class="sheet-data-grid">
+                            <div class="sheet-data-item">
+                                <div class="sheet-data-label">Customer Full Name</div>
+                                <div class="sheet-data-val" id="sheet-customer-name">...</div>
+                            </div>
+                            <div class="sheet-data-item">
+                                <div class="sheet-data-label">Customer Mobile</div>
+                                <div class="sheet-data-val" id="sheet-customer-phone">...</div>
+                            </div>
+                            <div class="sheet-data-item">
+                                <div class="sheet-data-label">Finance Account ID</div>
+                                <div class="sheet-data-val" id="sheet-loan-id">...</div>
+                            </div>
+                            <div class="sheet-data-item">
+                                <div class="sheet-data-label">Monthly EMI Amount</div>
+                                <div class="sheet-data-val" id="sheet-emi-amount">...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sheet Tab 3: GPS Location -->
+                <div id="sheet-tab-location" class="sheet-tab-content" style="display:none;">
+                    <div class="sheet-section">
+                        <div class="sheet-section-title">Real-Time Coordinates</div>
+                        <div style="background:var(--bg-canvas); border:1px solid var(--border); border-radius:10px; padding:16px; margin-bottom:12px;">
+                            <div style="font-size:18px; font-weight:800; font-family:'JetBrains Mono',monospace;" id="sheet-lat-lng">--</div>
+                            <div style="font-size:12px; color:var(--text-secondary); margin-top:4px;" id="sheet-accuracy">Accuracy: --</div>
+                            <div style="margin-top:14px;">
+                                <a id="sheet-maps-link" href="#" target="_blank" rel="noopener noreferrer" class="btn-topbar btn-topbar-primary" style="display:inline-flex; height:34px; padding:0 14px;">
+                                    <span>Open in Google Maps</span>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sheet Tab 4: Apps Inventory -->
+                <div id="sheet-tab-apps" class="sheet-tab-content" style="display:none;">
+                    <div class="sheet-section">
+                        <div class="sheet-section-title">Installed App Catalog</div>
+                        <div id="sheet-apps-container" style="display:flex; flex-direction:column; gap:8px;">
+                            <div style="text-align:center; padding:24px; color:var(--text-muted); font-size:13px;">Click Sync Apps above to fetch latest inventory.</div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Installed Apps Modal -->
-    <div id="apps-modal" class="modal-backdrop" style="display: none;" onclick="handleModalBackdropClick(event)">
-        <div class="modal-container" onclick="event.stopPropagation()">
-            <div class="modal-header">
+    <!-- Scalefusion Apps Modal -->
+    <div id="apps-modal" class="modal-backdrop" style="display: none;" onclick="closeAppsModal()">
+        <div class="modal-box" onclick="event.stopPropagation()">
+            <div class="modal-box-header">
                 <div>
-                    <div class="modal-title" id="modal-device-title">Installed Applications</div>
-                    <div class="modal-subtitle" id="modal-device-subtitle">Device ID: -</div>
+                    <div style="font-size: 16px; font-weight: 800; color: var(--text-main);" id="modal-device-title">Installed Applications</div>
+                    <div style="font-size: 12px; color: var(--text-muted);" id="modal-device-subtitle">Device ID: -</div>
                 </div>
                 <div style="display: flex; align-items: center; gap: 10px;">
-                    <button class="btn-refresh-apps" id="btn-refresh-apps" onclick="requestAppRefresh()">
-                        <svg viewBox="0 0 24 24"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-                        <span id="refresh-btn-text">Refresh from Device</span>
+                    <button class="btn-topbar btn-topbar-secondary" style="height: 32px;" onclick="requestAppRefresh()">
+                        <span>Refresh Apps</span>
                     </button>
-                    <button class="btn-close-modal" onclick="closeAppsModal()">&times;</button>
+                    <button class="btn-close-sheet" onclick="closeAppsModal()">&times;</button>
                 </div>
             </div>
-            <div class="modal-search-bar">
-                <input type="text" id="app-search-input" class="input-field" placeholder="Search app name or package name..." oninput="filterApps()">
-                <div class="app-filter-tabs">
-                    <button class="filter-btn active" id="filter-all" onclick="setAppFilter('all')">All (<span id="count-all">0</span>)</button>
-                    <button class="filter-btn" id="filter-user" onclick="setAppFilter('user')">User Apps (<span id="count-user">0</span>)</button>
-                    <button class="filter-btn" id="filter-system" onclick="setAppFilter('system')">System Apps (<span id="count-system">0</span>)</button>
-                </div>
+            <div style="padding: 12px 24px; border-bottom: 1px solid var(--border); background: var(--bg-canvas);">
+                <input type="text" id="app-search-input" class="scalefusion-input" placeholder="Search app name or package name..." oninput="filterApps()">
             </div>
-            <div class="apps-grid" id="apps-grid-content">
-                <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #71717a;">
-                    Loading installed applications...
-                </div>
+            <div class="apps-inventory-list" id="apps-grid-content">
+                <!-- Dynamic App Cards -->
             </div>
         </div>
     </div>
 
-    <footer>
-        <div>Prithon Tech Private Limited. Production Device Management Platform.</div>
-        <div>
-            <a href="/privacy">Privacy Policy</a>
-            <a href="/terms">Terms of Service</a>
-        </div>
-    </footer>
-
     <script>
-        // Mandatory Authentication Check
+        // Mandatory Auth check
         const authToken = localStorage.getItem("prithon_token");
         if (!authToken) {
             window.location.replace("/login");
@@ -850,396 +1811,645 @@
         function updateTenantUI() {
             if (!currentUser) return;
             const shopNameEl = document.getElementById("tenant-shop-name");
-            const codeTagEl = document.getElementById("tenant-code-tag");
-            const displayCodeEl = document.getElementById("display-tenant-code");
+            const codeEl = document.getElementById("display-tenant-code");
+            const codeQrEl = document.getElementById("display-tenant-code-qr");
+            const userDispEl = document.getElementById("user-display-name");
+            const avatarEl = document.getElementById("avatar-initial");
 
-            if (shopNameEl) shopNameEl.innerText = currentUser.shopName || "Shop Portal";
-            if (codeTagEl) codeTagEl.innerText = `Shop Code: ${currentUser.tenantCode || "ACTIVE"}`;
-            if (displayCodeEl) displayCodeEl.innerText = currentUser.tenantCode || "ACTIVE";
+            if (shopNameEl) shopNameEl.innerText = currentUser.shopName || "Enterprise Shop";
+            if (codeEl) codeEl.innerText = currentUser.tenantCode || "ACTIVE";
+            if (codeQrEl) codeQrEl.innerText = currentUser.tenantCode || "ACTIVE";
+            if (userDispEl) userDispEl.innerText = currentUser.shopName || "Admin";
+            if (avatarEl && currentUser.shopName) avatarEl.innerText = currentUser.shopName.charAt(0).toUpperCase();
         }
 
-        updateTenantUI();
-
-        // Verify token with backend
-        fetch("/api/auth/me", {
-            headers: { "Authorization": `Bearer ${authToken}` }
-        })
-        .then(res => {
-            if (!res.ok) throw new Error("Unauthenticated");
-            return res.json();
-        })
-        .then(data => {
-            currentUser = data.user;
-            localStorage.setItem("prithon_user", JSON.stringify(currentUser));
-            updateTenantUI();
-        })
-        .catch(() => {
+        document.getElementById("btn-logout")?.addEventListener("click", () => {
             localStorage.removeItem("prithon_token");
             localStorage.removeItem("prithon_user");
             window.location.replace("/login");
         });
 
-        // Logout listener
-        document.getElementById("btn-logout")?.addEventListener("click", () => {
-            fetch("/api/auth/logout", { method: "POST" }).finally(() => {
-                localStorage.removeItem("prithon_token");
-                localStorage.removeItem("prithon_user");
-                window.location.replace("/login");
-            });
-        });
+        // Workspace Panel Switching
+        function switchWorkspacePanel(panelId, navEl = null) {
+            document.querySelectorAll(".workspace-panel").forEach(p => p.classList.remove("active"));
+            const target = document.getElementById(panelId);
+            if (target) target.classList.add("active");
 
+            if (navEl) {
+                document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
+                navEl.classList.add("active");
+            }
+
+            const titleMap = {
+                'panel-fleet': 'Fleet Cockpit',
+                'panel-map': 'Live GPS & Geofence Radar',
+                'panel-financing': 'EMI & Repayment Ledger',
+                'panel-provisioning': '6-Tap QR Provisioning Station',
+                'panel-policies': 'Hardware Kiosk Security Rules',
+                'panel-sms': '0-KB Silent SMS Hub',
+                'panel-webhooks': 'Payment Settlement Dispatch'
+            };
+            const breadcrumbEl = document.getElementById("topbar-current-view");
+            if (breadcrumbEl && titleMap[panelId]) {
+                breadcrumbEl.innerText = titleMap[panelId];
+            }
+        }
+
+        // Fleet View Mode (Table vs Grid)
+        let currentViewMode = 'table';
+        function setFleetViewMode(mode) {
+            currentViewMode = mode;
+            const btnTable = document.getElementById("btn-view-table");
+            const btnGrid = document.getElementById("btn-view-grid");
+            const wrapperTable = document.getElementById("fleet-table-wrapper");
+            const wrapperGrid = document.getElementById("fleet-grid-wrapper");
+
+            if (mode === 'table') {
+                btnTable.classList.add("active");
+                btnGrid.classList.remove("active");
+                wrapperTable.style.display = "block";
+                wrapperGrid.style.display = "none";
+            } else {
+                btnGrid.classList.add("active");
+                btnTable.classList.remove("active");
+                wrapperTable.style.display = "none";
+                wrapperGrid.style.display = "grid";
+            }
+            renderDeviceList(registeredDevices);
+        }
+
+        // Global Fleet Search & Filter
+        let registeredDevices = {};
+        let currentFleetFilter = 'all';
+        let searchQuery = '';
+
+        function setFleetFilter(filter, el) {
+            currentFleetFilter = filter;
+            document.querySelectorAll(".filter-pill").forEach(p => p.classList.remove("active"));
+            if (el) el.classList.add("active");
+            renderDeviceList(registeredDevices);
+        }
+
+        function handleGlobalSearch(query) {
+            searchQuery = (query || '').toLowerCase().trim();
+            renderDeviceList(registeredDevices);
+        }
+
+        // Real-time WebSocket Gateway
         const socket = io({
             auth: { token: authToken }
         });
-        let registeredDevices = {};
-
-        function switchTab(targetId) {
-            document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-            document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
-            document.getElementById(targetId).classList.add('active');
-            event.currentTarget.classList.add('active');
-        }
 
         socket.on('connect', () => {
-            document.getElementById('socket-dot').classList.remove('offline');
-            document.getElementById('socket-status-text').innerText = 'Connected';
+            const socketDot = document.getElementById('socket-dot');
+            const socketText = document.getElementById('socket-status-text');
+            if (socketDot) socketDot.style.background = 'var(--success)';
+            if (socketText) socketText.innerText = 'Connected';
             socket.emit('join_tenant', { token: authToken });
         });
 
         socket.on('disconnect', () => {
-            document.getElementById('socket-dot').classList.add('offline');
-            document.getElementById('socket-status-text').innerText = 'Offline';
+            const socketDot = document.getElementById('socket-dot');
+            const socketText = document.getElementById('socket-status-text');
+            if (socketDot) socketDot.style.background = 'var(--danger)';
+            if (socketText) socketText.innerText = 'Reconnecting';
         });
 
         socket.on('device_list_updated', (devices) => {
             renderDeviceList(devices);
-            if (activeModalDeviceId && devices[activeModalDeviceId] && devices[activeModalDeviceId].apps) {
-                currentAppsList = devices[activeModalDeviceId].apps;
-                renderAppsGrid();
+        });
+
+        socket.on('device_location_updated', ({ deviceId, location }) => {
+            if (registeredDevices[deviceId]) {
+                registeredDevices[deviceId].latitude = location.latitude;
+                registeredDevices[deviceId].longitude = location.longitude;
+                registeredDevices[deviceId].locationAccuracy = location.accuracy;
+                renderDeviceList(registeredDevices);
             }
         });
 
+        socket.on('apps_inventory_updated', ({ deviceId, apps }) => {
+            if (registeredDevices[deviceId]) {
+                registeredDevices[deviceId].apps = apps;
+                if (currentActiveDeviceId === deviceId) {
+                    currentActiveAppsList = apps || [];
+                    renderAppsGrid();
+                }
+            }
+        });
+
+        // Core Render Function: Scalefusion Table & Cards
         function renderDeviceList(devices) {
-            registeredDevices = devices;
-            const container = document.getElementById('fleet-list');
-            const keys = Object.keys(devices);
+            registeredDevices = devices || {};
+            const tbody = document.getElementById('scalefusion-table-body');
+            const gridWrapper = document.getElementById('fleet-grid-wrapper');
+            const mapListWrapper = document.getElementById('live-map-fleet-list');
+            const ledgerWrapper = document.getElementById('financing-ledger-list');
+
+            const allKeys = Object.keys(registeredDevices);
 
             let normalCount = 0;
             let lockedCount = 0;
+            let onlineCount = 0;
+            let offlineCount = 0;
+            let doCount = 0;
 
-            keys.forEach(k => {
-                if (devices[k].status === 'LOCKED') lockedCount++;
+            allKeys.forEach(k => {
+                const d = registeredDevices[k];
+                if (d.status === 'LOCKED') lockedCount++;
                 else normalCount++;
+
+                if (d.online !== false) onlineCount++;
+                else offlineCount++;
+
+                if (d.isDeviceOwner) doCount++;
             });
 
-            document.getElementById('metric-total').innerText = keys.length;
-            document.getElementById('metric-normal').innerText = normalCount;
+            // Update Metric Cards
+            document.getElementById('metric-total').innerText = allKeys.length;
+            document.getElementById('metric-online').innerText = onlineCount;
             document.getElementById('metric-locked').innerText = lockedCount;
+            document.getElementById('metric-normal').innerText = normalCount;
+            document.getElementById('metric-do-count').innerText = doCount;
 
-            if (keys.length === 0) {
-                container.innerHTML = `
-                    <div class="empty-state" style="grid-column: 1 / -1;">
-                        No active hardware clients connected. Complete device enrollment to monitor telemetry.
-                    </div>`;
-                return;
-            }
+            document.getElementById('nav-count-fleet').innerText = allKeys.length;
+            document.getElementById('pill-count-all').innerText = allKeys.length;
+            document.getElementById('pill-count-online').innerText = onlineCount;
+            document.getElementById('pill-count-locked').innerText = lockedCount;
+            document.getElementById('pill-count-normal').innerText = normalCount;
+            document.getElementById('pill-count-offline').innerText = offlineCount;
 
-            container.innerHTML = '';
-            keys.forEach(id => {
-                const dev = devices[id];
+            // Apply Filters & Search
+            const filteredKeys = allKeys.filter(id => {
+                const dev = registeredDevices[id];
                 const isLocked = dev.status === 'LOCKED';
                 const isOnline = dev.online !== false;
 
-                const card = document.createElement('div');
-                card.className = 'device-card';
-                card.innerHTML = `
-                    <div class="device-card-header">
+                if (currentFleetFilter === 'online' && !isOnline) return false;
+                if (currentFleetFilter === 'offline' && isOnline) return false;
+                if (currentFleetFilter === 'locked' && !isLocked) return false;
+                if (currentFleetFilter === 'normal' && isLocked) return false;
+
+                if (searchQuery) {
+                    const matchText = `${dev.brand} ${dev.model} ${id} ${dev.enteredImei} ${dev.hardwareImei} ${dev.customerName} ${dev.customerPhone} ${dev.loanId}`.toLowerCase();
+                    if (!matchText.includes(searchQuery)) return false;
+                }
+                return true;
+            });
+
+            // 1. Render Table View
+            if (tbody) {
+                tbody.innerHTML = '';
+                if (filteredKeys.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="7">
+                                <div class="empty-fleet-hero">
+                                    <div class="empty-icon-shield">
+                                        <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                                    </div>
+                                    <div class="empty-title">No Managed Devices Found</div>
+                                    <div class="empty-desc">No active devices match your current filter. Enroll new hardware via the 6-Tap QR Station or switch filters.</div>
+                                    <button class="btn-topbar btn-topbar-primary" onclick="switchWorkspacePanel('panel-provisioning')">
+                                        <span>+ Enroll First Device</span>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                } else {
+                    filteredKeys.forEach(id => {
+                        const dev = registeredDevices[id];
+                        const isLocked = dev.status === 'LOCKED';
+                        const isOnline = dev.online !== false;
+                        const battery = dev.battery || 100;
+                        const imei = dev.enteredImei || dev.hardwareImei || id;
+
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>
+                                <div class="device-cell-main">
+                                    <div class="device-avatar-icon">
+                                        <svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                                    </div>
+                                    <div class="device-title-wrap">
+                                        <span class="device-brand-model">${escapeHtml(dev.brand)} ${escapeHtml(dev.model)}</span>
+                                        <span class="device-id-mono">Android ${escapeHtml(dev.androidVersion || '14')} • ${dev.isDeviceOwner ? '<span style="color:var(--brand-accent); font-weight:700;">DO Armed</span>' : 'Admin'}</span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <div style="display:flex; flex-direction:column; gap:2px;">
+                                    <span style="font-family:'JetBrains Mono',monospace; font-weight:700; font-size:12px;">${escapeHtml(imei)}</span>
+                                    <span style="font-size:11px; color:var(--text-muted);">${dev.imeiVerified ? '<span style="color:var(--success); font-weight:700;">✓ Hardware Bound</span>' : 'Active Binding'}</span>
+                                </div>
+                            </td>
+                            <td>
+                                ${dev.customerName ? `
+                                    <div class="customer-chip">
+                                        <span class="customer-name-bold">👤 ${escapeHtml(dev.customerName)}</span>
+                                        <span class="customer-phone-sub">📞 ${escapeHtml(dev.customerPhone || 'N/A')}</span>
+                                        <span style="font-size:11px; color:var(--text-muted);">Loan: <strong style="color:var(--text-secondary);">${escapeHtml(dev.loanId || 'N/A')}</strong> • ₹${escapeHtml(dev.emiAmount || '0')}/mo</span>
+                                    </div>
+                                ` : `
+                                    <span style="font-size:12px; color:var(--text-muted); font-style:italic;">KYC Pending</span>
+                                `}
+                            </td>
+                            <td>
+                                <div class="battery-indicator-wrap">
+                                    <div class="battery-bar-outer">
+                                        <div class="battery-bar-inner" style="width:${battery}%; background:${battery < 20 ? 'var(--danger)' : (battery < 50 ? 'var(--warning)' : 'var(--success)')};"></div>
+                                    </div>
+                                    <span>${battery}%</span>
+                                </div>
+                                <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">Seen: ${escapeHtml(dev.lastSeen || 'Just now')}</div>
+                            </td>
+                            <td>
+                                ${(dev.latitude && dev.longitude) ? `
+                                    <a href="https://www.google.com/maps?q=${dev.latitude},${dev.longitude}" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; gap:5px; text-decoration:none; font-size:11.5px; font-weight:700; color:var(--success); background:var(--success-subtle); border:1px solid var(--success-border); padding:3px 8px; border-radius:6px;">
+                                        <span>📍 ${dev.latitude.toFixed(3)}°, ${dev.longitude.toFixed(3)}°</span>
+                                    </a>
+                                ` : `
+                                    <span style="font-size:11.5px; color:var(--text-muted);">Awaiting GPS...</span>
+                                `}
+                            </td>
+                            <td>
+                                <div style="display:flex; flex-direction:column; gap:4px;">
+                                    <span class="status-badge ${isLocked ? 'locked' : 'normal'}">
+                                        <span class="status-badge online-dot"></span>
+                                        <span>${isLocked ? 'Kiosk Locked' : 'Normal'}</span>
+                                    </span>
+                                    <span style="font-size:10.5px; font-weight:600; color:${isOnline ? 'var(--success)' : 'var(--text-muted)'}; margin-left:4px;">
+                                        ${isOnline ? '● Live Online' : '○ Offline'}
+                                    </span>
+                                </div>
+                            </td>
+                            <td style="text-align: right;">
+                                <div class="actions-cell-group">
+                                    <button class="btn-table-action ${isLocked ? 'btn-table-unlock' : 'btn-table-lock'}" onclick="issueCommand('${id}', '${isLocked ? 'UNLOCK' : 'LOCK'}')">
+                                        ${isLocked ? '🔓 Unlock' : '🔒 Lock'}
+                                    </button>
+                                    <button class="btn-table-action btn-table-manage" onclick="openDeviceInspector('${id}')">
+                                        <span>Manage</span>
+                                    </button>
+                                </div>
+                            </td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                }
+            }
+
+            // 2. Render Grid Cards View
+            if (gridWrapper) {
+                gridWrapper.innerHTML = '';
+                filteredKeys.forEach(id => {
+                    const dev = registeredDevices[id];
+                    const isLocked = dev.status === 'LOCKED';
+                    const isOnline = dev.online !== false;
+                    const battery = dev.battery || 100;
+
+                    const card = document.createElement('div');
+                    card.style.cssText = "background:#fff; border:1px solid var(--border); border-radius:10px; padding:18px; box-shadow:var(--shadow-sm); display:flex; flex-direction:column; justify-content:space-between;";
+                    card.innerHTML = `
                         <div>
-                            <div class="device-title">${escapeHtml(dev.brand)} ${escapeHtml(dev.model)}</div>
-                            <div class="device-id">${escapeHtml(id)}</div>
-                        </div>
-                        <div style="display: flex; gap: 6px; align-items: center;">
-                            <span class="badge ${isOnline ? 'badge-normal' : ''}" style="${!isOnline ? 'background: rgba(113, 113, 122, 0.2); color: #a1a1aa; border: 1px solid rgba(113, 113, 122, 0.4);' : ''}">
-                                ${isOnline ? 'ONLINE' : 'OFFLINE'}
-                            </span>
-                            <span class="badge ${isLocked ? 'badge-locked' : 'badge-normal'}">
-                                ${isLocked ? 'LOCKED' : 'NORMAL'}
-                            </span>
-                        </div>
-                    </div>
-
-                    ${dev.customerName ? `
-                        <div style="background: rgba(37, 99, 235, 0.12); border: 1px solid rgba(37, 99, 235, 0.3); border-radius: 6px; padding: 10px 14px; margin: 12px 0;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                                <span style="font-size: 14px; font-weight: 700; color: #fff;">👤 ${escapeHtml(dev.customerName)}</span>
-                                <span style="font-size: 12px; color: #60a5fa; font-weight: 600;">📞 ${escapeHtml(dev.customerPhone || 'N/A')}</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; font-size: 12px; color: #94a3b8; margin-top: 4px;">
-                                <span>Loan: <strong style="color: #cbd5e1;">${escapeHtml(dev.loanId || 'N/A')}</strong></span>
-                                <span>EMI: <strong style="color: #38bdf8;">₹${escapeHtml(dev.emiAmount || '0')}</strong></span>
-                            </div>
-                        </div>
-
-                        <!-- 0-KB Silent SMS Trigger helper -->
-                        <div style="background: rgba(245, 158, 11, 0.06); border: 1px solid rgba(245, 158, 11, 0.2); border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; font-size: 11px; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-                            <div style="min-width: 0;">
-                                <div style="color: #fbbf24; font-weight: 700; display: flex; align-items: center; gap: 6px;">
-                                    <span>📡 Offline SMS Trigger (0-KB Internet)</span>
+                            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
+                                <div>
+                                    <div style="font-weight:800; font-size:14px; color:var(--text-main);">${escapeHtml(dev.brand)} ${escapeHtml(dev.model)}</div>
+                                    <div style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-muted);">${escapeHtml(id)}</div>
                                 </div>
-                                <div style="color: #cbd5e1; font-family: monospace; font-size: 11px; margin-top: 3px;">
-                                    Lock: <span style="color: #f87171;">#PRITHON:LOCK:${escapeHtml(dev.loanId || 'ADMIN')}#</span>
-                                </div>
+                                <span class="status-badge ${isLocked ? 'locked' : 'normal'}">${isLocked ? 'Locked' : 'Normal'}</span>
                             </div>
-                            ${dev.customerPhone ? `
-                                <button onclick="handleSendSms('${escapeHtml(dev.customerPhone)}', '${escapeHtml(dev.loanId || 'ADMIN')}')" style="background: #27272a; border: 1px solid #3f3f46; color: #f4f4f5; padding: 5px 9px; border-radius: 4px; font-size: 11px; font-weight: 600; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; cursor: pointer;" title="Send Offline SMS Command">
-                                    Send SMS
-                                </button>
+
+                            ${dev.customerName ? `
+                                <div style="background:var(--bg-canvas); border:1px solid var(--border); border-radius:8px; padding:10px; margin-bottom:12px; font-size:12px;">
+                                    <div style="font-weight:700;">👤 ${escapeHtml(dev.customerName)} (${escapeHtml(dev.customerPhone || 'N/A')})</div>
+                                    <div style="color:var(--text-muted); margin-top:2px;">Loan: ${escapeHtml(dev.loanId || 'N/A')} • ₹${escapeHtml(dev.emiAmount || '0')}</div>
+                                </div>
                             ` : ''}
-                        </div>
-                    ` : `
-                        <div style="background: rgba(148, 163, 184, 0.05); border: 1px dashed rgba(148, 163, 184, 0.2); border-radius: 6px; padding: 10px 12px; margin: 12px 0; font-size: 12px; color: #94a3b8; display: flex; justify-content: space-between; align-items: center;">
-                            <span>Customer: <em>Fill Form on Phone or Assign</em></span>
-                            <button onclick="promptCustomerDetails('${id}')" style="background: #2563eb; color: #fff; border: none; border-radius: 4px; padding: 4px 10px; font-size: 11px; cursor: pointer; font-weight: 600;">Assign</button>
-                        </div>
-                    `}
 
-                    <!-- Live GPS Location Tracker -->
-                    <div style="background: rgba(16, 185, 129, 0.07); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 6px; padding: 10px 14px; margin-bottom: 12px; font-size: 12px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <div style="display: flex; align-items: center; gap: 6px; color: #10b981; font-weight: 700;">
-                                <span style="font-size: 14px;">📍</span>
-                                <span>Device GPS Location</span>
+                            <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--text-secondary); margin-bottom:14px;">
+                                <span>Battery: <strong>${battery}%</strong></span>
+                                <span>Status: <strong>${isOnline ? 'Online' : 'Offline'}</strong></span>
                             </div>
-                            <button id="btn-gps-${escapeHtml(id)}" onclick="requestDeviceLocation('${id}')" style="background: #18181b; border: 1px solid #27272a; color: #34d399; padding: 3px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;" title="Request high-accuracy GPS fix from device">
-                                🔄 Refresh GPS
+                        </div>
+
+                        <div style="display:flex; gap:8px;">
+                            <button class="btn-table-action ${isLocked ? 'btn-table-unlock' : 'btn-table-lock'}" style="flex:1; justify-content:center;" onclick="issueCommand('${id}', '${isLocked ? 'UNLOCK' : 'LOCK'}')">
+                                ${isLocked ? 'Unlock' : 'Lock'}
+                            </button>
+                            <button class="btn-table-action btn-table-manage" style="flex:1; justify-content:center;" onclick="openDeviceInspector('${id}')">
+                                <span>Manage</span>
                             </button>
                         </div>
-                        ${(dev.latitude && dev.longitude) ? `
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
-                                <div>
-                                    <div style="color: #f4f4f5; font-weight: 700; font-family: monospace; font-size: 12px;">
-                                        ${dev.latitude.toFixed(5)}°, ${dev.longitude.toFixed(5)}°
-                                    </div>
-                                    <div style="color: #94a3b8; font-size: 11px; margin-top: 2px;">
-                                        Accuracy: ±${Math.round(dev.locationAccuracy || 15)}m • <span style="color: #34d399;">Active Fix</span>
-                                    </div>
+                    `;
+                    gridWrapper.appendChild(card);
+                });
+            }
+
+            // 3. Render Live Map Panel Cards
+            if (mapListWrapper) {
+                mapListWrapper.innerHTML = '';
+                allKeys.forEach(id => {
+                    const dev = registeredDevices[id];
+                    const hasGps = dev.latitude && dev.longitude;
+                    const card = document.createElement('div');
+                    card.style.cssText = "background:var(--bg-canvas); border:1px solid var(--border); border-radius:10px; padding:16px;";
+                    card.innerHTML = `
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                            <div style="font-weight:700; font-size:14px;">${escapeHtml(dev.brand)} ${escapeHtml(dev.model)}</div>
+                            <span class="status-badge ${dev.status === 'LOCKED' ? 'locked' : 'normal'}">${dev.status || 'NORMAL'}</span>
+                        </div>
+                        <div style="font-size:12px; color:var(--text-secondary); margin-bottom:8px;">
+                            Customer: <strong>${escapeHtml(dev.customerName || 'Unassigned')}</strong>
+                        </div>
+                        ${hasGps ? `
+                            <div style="background:#fff; border:1px solid var(--border); border-radius:8px; padding:12px; margin-bottom:12px;">
+                                <div style="font-family:'JetBrains Mono',monospace; font-weight:800; font-size:13px; color:var(--success);">
+                                    📍 ${dev.latitude.toFixed(5)}°, ${dev.longitude.toFixed(5)}°
                                 </div>
-                                <a href="https://www.google.com/maps?q=${dev.latitude},${dev.longitude}" target="_blank" rel="noopener noreferrer" style="background: #059669; color: #fff; text-decoration: none; padding: 6px 12px; border-radius: 4px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.3);">
-                                    🗺️ View on Maps
-                                </a>
+                                <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">Accuracy Radius: ±${Math.round(dev.locationAccuracy || 15)}m</div>
                             </div>
+                            <a href="https://www.google.com/maps?q=${dev.latitude},${dev.longitude}" target="_blank" rel="noopener noreferrer" class="btn-topbar btn-topbar-primary" style="width:100%; height:36px; justify-content:center; text-decoration:none;">
+                                <span>View on Live Google Maps</span>
+                            </a>
                         ` : `
-                            <div style="color: #94a3b8; font-size: 11px; margin-top: 6px; display: flex; justify-content: space-between; align-items: center;">
-                                <span>Awaiting coordinates from device...</span>
-                                <span style="color: #10b981; font-size: 10px; font-weight: 600;">GPS Auto-Tracking</span>
+                            <div style="padding:16px; background:#fff; border:1px dashed var(--border); border-radius:8px; text-align:center; font-size:12px; color:var(--text-muted); margin-bottom:12px;">
+                                Satellite coordinates pending...
                             </div>
+                            <button class="btn-topbar btn-topbar-secondary" style="width:100%; height:36px; justify-content:center;" onclick="requestDeviceLocation('${id}')">
+                                <span>Request GPS Triangulation</span>
+                            </button>
                         `}
-                    </div>
+                    `;
+                    mapListWrapper.appendChild(card);
+                });
+            }
 
-                    <!-- Quick Action Buttons Directly Below Device Name -->
-                    <div class="device-actions-row">
-                        <button class="btn-action btn-lock ${isLocked ? 'muted' : ''}" onclick="issueCommand('${id}', 'LOCK')">
-                            <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                            ${isLocked ? 'Locked (Re-lock)' : 'Lock Device'}
-                        </button>
-                        <button class="btn-action btn-unlock ${!isLocked ? 'muted' : ''}" onclick="issueCommand('${id}', 'UNLOCK')">
-                            <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
-                            ${!isLocked ? 'Unlocked (Active)' : 'Unlock Device'}
-                        </button>
-                    </div>
-
-                    <div class="data-table">
-                        <div class="data-row">
-                            <span>Device IMEI (Dual Check)</span>
-                            <span>
-                                ${dev.enteredImei ? escapeHtml(dev.enteredImei) : (dev.hardwareImei ? escapeHtml(dev.hardwareImei) : "<span style=\"color:#71717a;\">Not Recorded</span>")}
-                                ${dev.imeiVerified ? "<span style=\"color:#10b981; font-weight:700; margin-left:4px;\">✓ Verified</span>" : (dev.enteredImei ? "<span style=\"color:#f59e0b; margin-left:4px;\">⏳ Pending</span>" : "")}
+            // 4. Render Financing Ledger Rows
+            if (ledgerWrapper) {
+                ledgerWrapper.innerHTML = '';
+                allKeys.forEach(id => {
+                    const dev = registeredDevices[id];
+                    const item = document.createElement('div');
+                    item.style.cssText = "background:var(--bg-canvas); border:1px solid var(--border); border-radius:8px; padding:14px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;";
+                    item.innerHTML = `
+                        <div>
+                            <div style="font-weight:700; font-size:13.5px;">${escapeHtml(dev.customerName || 'Customer Not Registered')}</div>
+                            <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">
+                                Loan ID: <strong style="font-family:'JetBrains Mono',monospace;">${escapeHtml(dev.loanId || 'N/A')}</strong> • Phone: ${escapeHtml(dev.customerPhone || 'N/A')}
+                            </div>
+                        </div>
+                        <div style="text-align:right;">
+                            <div style="font-weight:800; font-size:16px; color:var(--text-main);">₹${escapeHtml(dev.emiAmount || '0')}/mo</div>
+                            <span class="status-badge ${dev.status === 'LOCKED' ? 'locked' : 'normal'}" style="margin-top:4px;">
+                                ${dev.status === 'LOCKED' ? 'Overdue - Kiosk Locked' : 'Account Active'}
                             </span>
                         </div>
-                        <div class="data-row">
-                            <span>Battery Status</span>
-                            <span>${dev.battery}%</span>
-                        </div>
-                        <div class="data-row">
-                            <span>OS Version</span>
-                            <span>Android ${escapeHtml(dev.androidVersion)}</span>
-                        </div>
-                        <div class="data-row">
-                            <span>Device Owner</span>
-                            <span>${dev.isDeviceOwner ? 'Enforced' : 'Unverified'}</span>
-                        </div>
-                        <div class="data-row">
-                            <span>Last Synchronization</span>
-                            <span>${escapeHtml(dev.lastSeen)}</span>
-                        </div>
-                    </div>
-
-                    <div style="margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); display: flex; gap: 8px;">
-                        <button class="btn" style="flex: 1; background: #18181b; color: #f4f4f5; border: 1px solid #27272a; border-radius: 6px; padding: 9px 12px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.15s ease;" onmouseover="this.style.borderColor='#3b82f6'; this.style.background='#222228';" onmouseout="this.style.borderColor='#27272a'; this.style.background='#18181b';" onclick="openAppsModal('${id}', '${escapeHtml(dev.brand)} ${escapeHtml(dev.model)}')">
-                            <svg style="width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2;" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-                            <span>Apps (${dev.apps ? dev.apps.length : '0'})</span>
-                        </button>
-                        <button class="btn" style="background: rgba(239, 68, 68, 0.08); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 6px; padding: 9px 12px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.15s ease;" onmouseover="this.style.background='rgba(239, 68, 68, 0.18)'; this.style.borderColor='#ef4444';" onmouseout="this.style.background='rgba(239, 68, 68, 0.08)'; this.style.borderColor='rgba(239, 68, 68, 0.25)';" onclick="deleteAndReleaseDevice('${id}', '${escapeHtml(dev.customerName || dev.brand + ' ' + dev.model)}')">
-                            <svg style="width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2;" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-                            <span>Release &amp; Delete</span>
-                        </button>
-                    </div>
-                `;
-                container.appendChild(card);
-            });
-        }
-
-        // Fetch initial list via REST API on page load
-        fetch('/api/devices', {
-            headers: { "Authorization": `Bearer ${authToken}` }
-        })
-            .then(res => res.json())
-            .then(devices => renderDeviceList(devices))
-            .catch(() => {});
-
-        function handleSendSms(phone, loanId) {
-            const code = `#PRITHON:LOCK:${loanId || 'ADMIN'}#`;
-            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-            if (isMobile) {
-                window.location.href = `sms:${phone}?body=${encodeURIComponent(code)}`;
-            } else {
-                navigator.clipboard.writeText(code).then(() => {
-                    alert(`📡 OFFLINE SMS LOCK:\n\n1. Kisi bhi phone se customer ke number (${phone}) par yeh SMS bhejein:\n\n${code}\n\n✓ SMS Code clipboard me copy ho gaya hai!\n\nNote: Website se direct 1-click lock karne ke liye neeche diye gaye Red color ke "Lock Device" button par click karein!`);
-                }).catch(() => {
-                    alert(`📡 OFFLINE SMS LOCK:\n\nKisi bhi phone se customer ke number (${phone}) par yeh SMS bhejein:\n\n${code}`);
+                    `;
+                    ledgerWrapper.appendChild(item);
                 });
             }
         }
 
-        function requestDeviceLocation(deviceId) {
-            const btn = document.getElementById(`btn-gps-${deviceId}`);
-            if (btn) {
-                btn.innerHTML = '⏳ Requesting...';
-                btn.disabled = true;
-            }
-            if (socket && socket.connected) {
-                socket.emit('request_device_location', { deviceId });
-            }
-            setTimeout(() => {
-                if (btn) {
-                    btn.innerHTML = '🔄 Refresh GPS';
-                    btn.disabled = false;
-                }
-            }, 3000);
+        // Fetch initial fleet via REST
+        function refreshFleetData() {
+            fetch('/api/devices', {
+                headers: { "Authorization": `Bearer ${authToken}` }
+            })
+                .then(res => res.json())
+                .then(devices => renderDeviceList(devices))
+                .catch(() => {});
         }
 
+        refreshFleetData();
+
+        // Remote Commands API
         async function issueCommand(deviceId, command) {
             try {
-                const response = await fetch(`/api/devices/${encodeURIComponent(deviceId)}/command`, {
+                const res = await fetch(`/api/devices/${deviceId}/command`, {
                     method: 'POST',
-                    headers: { 
+                    headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${authToken}`
                     },
                     body: JSON.stringify({ command })
                 });
-                const res = await response.json();
-                if (!response.ok) alert(res.error || 'Command dispatch failed');
-            } catch (err) {
-                alert('Network error communicating with control plane: ' + err.message);
+                const data = await res.json();
+                if (data.success) {
+                    if (registeredDevices[deviceId]) {
+                        if (command === 'LOCK') registeredDevices[deviceId].status = 'LOCKED';
+                        if (command === 'UNLOCK') registeredDevices[deviceId].status = 'NORMAL';
+                        renderDeviceList(registeredDevices);
+                        if (currentActiveDeviceId === deviceId) {
+                            openDeviceInspector(deviceId);
+                        }
+                    }
+                } else {
+                    alert('Command failed: ' + (data.error || 'Server rejected command'));
+                }
+            } catch (e) {
+                alert('Network error issuing command.');
             }
+        }
+
+        function requestDeviceLocation(deviceId) {
+            issueCommand(deviceId, 'GET_LOCATION');
+            alert('High-accuracy GPS request dispatched to device.');
         }
 
         async function deleteAndReleaseDevice(deviceId, name) {
-            const confirmed = confirm(
-                `🚨 PERMANENT DEVICE RELEASE & REMOVAL:\n\n` +
-                `Kya aap sach me device (${name}) ko release aur delete karna chahte hain?\n\n` +
-                `✓ Isse phone ke sabhi finance locks hat jayenge.\n` +
-                `✓ Phone 100% normal mode me wapas aa jayega.\n` +
-                `✓ Phone se application automatically uninstall ho jayegi.`
-            );
-            if (!confirmed) return;
-
+            if (!confirm(`Warning: Are you sure you want to completely release ${name}?\n\nThis will remove all security locks, clear Device Owner rights, and remove the app.`)) {
+                return;
+            }
             try {
-                const response = await fetch(`/api/devices/${encodeURIComponent(deviceId)}`, {
+                const res = await fetch(`/api/devices/${deviceId}`, {
                     method: 'DELETE',
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`
-                    }
+                    headers: { 'Authorization': `Bearer ${authToken}` }
                 });
-                const res = await response.json();
-                if (response.ok) {
-                    alert('✓ Device release instruction sent!\n\nPhone se sabhi restrictions hat gayi hain aur uninstall trigger ho gaya hai.');
-                } else {
-                    alert('Error: ' + (res.error || 'Failed to release device.'));
+                const data = await res.json();
+                if (data.success) {
+                    delete registeredDevices[deviceId];
+                    renderDeviceList(registeredDevices);
+                    closeDeviceInspector();
+                    alert('Device released and unenrollment command sent.');
                 }
-            } catch (err) {
-                alert('Network error: ' + err.message);
+            } catch (e) {
+                alert('Failed to release device.');
             }
         }
 
-        async function promptCustomerDetails(deviceId) {
-            const current = registeredDevices[deviceId] || {};
-            const customerName = prompt('Enter Customer Full Name:', current.customerName || '');
-            if (customerName === null) return;
-            const customerPhone = prompt('Enter Customer Mobile Number:', current.customerPhone || '');
-            if (customerPhone === null) return;
-            const enteredImei = prompt('Enter 15-Digit Device IMEI Number:', current.enteredImei || '');
-            if (enteredImei === null) return;
-            const loanId = prompt('Enter Loan / Account ID:', current.loanId || '');
-            if (loanId === null) return;
-            const emiAmount = prompt('Enter Monthly EMI Amount (INR):', current.emiAmount || '');
-            if (emiAmount === null) return;
+        // Scalefusion Deep Device Inspector Side Sheet
+        let currentActiveDeviceId = null;
+        function openDeviceInspector(deviceId) {
+            currentActiveDeviceId = deviceId;
+            const dev = registeredDevices[deviceId];
+            if (!dev) return;
+
+            document.getElementById("sheet-device-name").innerText = `${dev.brand} ${dev.model}`;
+            document.getElementById("sheet-device-id").innerText = `ID: ${deviceId}`;
+            document.getElementById("sheet-imei").innerText = dev.enteredImei || dev.hardwareImei || deviceId;
+            document.getElementById("sheet-os").innerText = `Android ${dev.androidVersion || '14'}`;
+            document.getElementById("sheet-battery").innerText = `${dev.battery || 100}%`;
+            document.getElementById("sheet-do-state").innerText = dev.isDeviceOwner ? 'Device Owner (Armed)' : 'Device Admin Active';
+            document.getElementById("sheet-last-seen").innerText = dev.lastSeen || 'Online';
+            document.getElementById("sheet-status").innerText = dev.status || 'NORMAL';
+
+            document.getElementById("sheet-customer-name").innerText = dev.customerName || 'Not Registered';
+            document.getElementById("sheet-customer-phone").innerText = dev.customerPhone || 'N/A';
+            document.getElementById("sheet-loan-id").innerText = dev.loanId || 'N/A';
+            document.getElementById("sheet-emi-amount").innerText = dev.emiAmount ? `₹${dev.emiAmount}` : 'N/A';
+
+            if (dev.latitude && dev.longitude) {
+                document.getElementById("sheet-lat-lng").innerText = `${dev.latitude.toFixed(5)}°, ${dev.longitude.toFixed(5)}°`;
+                document.getElementById("sheet-accuracy").innerText = `Accuracy Radius: ±${Math.round(dev.locationAccuracy || 15)}m`;
+                document.getElementById("sheet-maps-link").href = `https://www.google.com/maps?q=${dev.latitude},${dev.longitude}`;
+                document.getElementById("sheet-maps-link").style.display = "inline-flex";
+            } else {
+                document.getElementById("sheet-lat-lng").innerText = 'Pending GPS Fix';
+                document.getElementById("sheet-accuracy").innerText = 'Awaiting coordinates from device';
+                document.getElementById("sheet-maps-link").style.display = "none";
+            }
+
+            // Populate apps preview
+            const appsContainer = document.getElementById("sheet-apps-container");
+            if (dev.apps && dev.apps.length > 0) {
+                appsContainer.innerHTML = '';
+                dev.apps.slice(0, 15).forEach(app => {
+                    const row = document.createElement('div');
+                    row.className = "app-entry-card";
+                    row.innerHTML = `
+                        <img src="${app.icon || '/favicon.svg'}" class="app-entry-icon" onerror="this.src='/favicon.svg'">
+                        <div style="min-width:0; flex:1;">
+                            <div style="font-weight:700; font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(app.appName)}</div>
+                            <div style="font-size:11px; color:var(--text-muted); font-family:monospace; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(app.packageName)}</div>
+                        </div>
+                    `;
+                    appsContainer.appendChild(row);
+                });
+            } else {
+                appsContainer.innerHTML = `<div style="text-align:center; padding:24px; color:var(--text-muted); font-size:13px;">No installed applications cached. Click Sync Apps to fetch.</div>`;
+            }
+
+            const backdrop = document.getElementById("device-inspector-backdrop");
+            backdrop.classList.add("active");
+        }
+
+        function closeDeviceInspector() {
+            const backdrop = document.getElementById("device-inspector-backdrop");
+            backdrop.classList.remove("active");
+            currentActiveDeviceId = null;
+        }
+
+        function switchSheetTab(tabId, btn) {
+            document.querySelectorAll(".sheet-tab-content").forEach(c => c.style.display = "none");
+            document.querySelectorAll(".sheet-tab-btn").forEach(b => b.classList.remove("active"));
+            const target = document.getElementById(tabId);
+            if (target) target.style.display = "block";
+            if (btn) btn.classList.add("active");
+        }
+
+        function triggerSheetCommand(command) {
+            if (!currentActiveDeviceId) return;
+            issueCommand(currentActiveDeviceId, command);
+        }
+
+        function triggerSheetRelease() {
+            if (!currentActiveDeviceId) return;
+            const dev = registeredDevices[currentActiveDeviceId];
+            deleteAndReleaseDevice(currentActiveDeviceId, dev ? (dev.brand + ' ' + dev.model) : 'Device');
+        }
+
+        // Provisioning 6-Tap QR Code
+        async function generateEnrollmentQr() {
+            const container = document.getElementById('qr-target');
+            container.innerHTML = '';
 
             try {
-                const response = await fetch(`/api/devices/${encodeURIComponent(deviceId)}/customer`, {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${authToken}`
-                    },
-                    body: JSON.stringify({ customerName, customerPhone, enteredImei, loanId, emiAmount })
+                const res = await fetch('/api/provisioning-profile', {
+                    headers: { "Authorization": `Bearer ${authToken}` }
                 });
-                const res = await response.json();
-                if (!response.ok) alert(res.error || 'Update failed');
-            } catch (err) {
-                alert('Failed to update customer: ' + err.message);
+                const config = await res.json();
+
+                const ssid = document.getElementById('wifi-ssid').value.trim();
+                const pass = document.getElementById('wifi-pass').value.trim();
+                if (ssid) config["android.app.extra.PROVISIONING_WIFI_SSID"] = ssid;
+                if (pass) config["android.app.extra.PROVISIONING_WIFI_PASSWORD"] = pass;
+
+                new QRCode(container, {
+                    text: JSON.stringify(config),
+                    width: 200,
+                    height: 200,
+                    colorDark: "#0f172a",
+                    colorLight: "#ffffff",
+                    correctLevel: QRCode.CorrectLevel.M
+                });
+            } catch (e) {
+                container.innerText = "Error generating enrollment profile.";
             }
         }
 
+        // Offline SMS trigger
+        function dispatchManualSms(action) {
+            const phone = document.getElementById("sms-target-phone").value.trim();
+            const loan = document.getElementById("sms-target-loan").value.trim() || 'ADMIN';
+            if (!phone) {
+                alert('Please enter recipient mobile number.');
+                return;
+            }
+            const body = `#PRITHON:${action}:${loan}#`;
+            window.open(`sms:${phone}?body=${encodeURIComponent(body)}`);
+        }
+
+        // Webhook tester
         async function dispatchPaymentWebhook() {
             const deviceId = document.getElementById('sim-id').value.trim();
-            if (!deviceId) return alert('Enter a valid device identifier.');
-
-            try {
-                const response = await fetch('/api/webhook/payment-received', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ deviceId, status: 'SUCCESS' })
-                });
-                const res = await response.json();
-                if (res.success) {
-                    alert('Settlement verified. Unlock instruction issued.');
-                } else {
-                    alert('Webhook processed. Target device state updated.');
-                }
-            } catch (err) {
-                alert('Webhook dispatch failed: ' + err.message);
+            if (!deviceId) {
+                alert('Enter target Device ID or Loan ID');
+                return;
             }
+            const res = await fetch('/api/webhook/payment-received', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ deviceId, status: 'SUCCESS' })
+            });
+            const data = await res.json();
+            alert('Settlement dispatched: ' + (data.message || 'Verification complete.'));
+            refreshFleetData();
         }
 
-        async function generateEnrollmentQr() {
-            const ssid = document.getElementById('wifi-ssid').value.trim();
-            const pass = document.getElementById('wifi-pass').value.trim();
-            const host = window.location.origin;
-            const tenantId = currentUser ? currentUser.id : '';
-            const tenantCode = currentUser ? currentUser.tenantCode : '';
+        // Apps Modal
+        let currentActiveAppsList = [];
+        function closeAppsModal() {
+            document.getElementById('apps-modal').style.display = 'none';
+        }
 
-            const response = await fetch(`/api/provisioning-payload?ssid=${encodeURIComponent(ssid)}&password=${encodeURIComponent(pass)}&host=${encodeURIComponent(host)}&tenantId=${encodeURIComponent(tenantId)}&tenantCode=${encodeURIComponent(tenantCode)}`);
-            const data = await response.json();
+        function filterApps() {
+            const query = (document.getElementById('app-search-input')?.value || '').toLowerCase().trim();
+            const grid = document.getElementById('apps-grid-content');
+            if (!grid) return;
+            grid.innerHTML = '';
 
-            const target = document.getElementById('qr-target');
-            target.innerHTML = '';
-            new QRCode(target, {
-                text: JSON.stringify(data.payload),
-                width: 240,
-                height: 240,
-                correctLevel: QRCode.CorrectLevel.M
+            const filtered = currentActiveAppsList.filter(a => {
+                return (a.appName || '').toLowerCase().includes(query) || (a.packageName || '').toLowerCase().includes(query);
+            });
+
+            if (filtered.length === 0) {
+                grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:24px; color:var(--text-muted);">No matching apps.</div>';
+                return;
+            }
+
+            filtered.forEach(app => {
+                const item = document.createElement('div');
+                item.className = "app-entry-card";
+                item.innerHTML = `
+                    <img src="${app.icon || '/favicon.svg'}" class="app-entry-icon" onerror="this.src='/favicon.svg'">
+                    <div style="min-width:0; flex:1;">
+                        <div style="font-weight:700; font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(app.appName)}</div>
+                        <div style="font-size:11px; color:var(--text-muted); font-family:monospace; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(app.packageName)}</div>
+                    </div>
+                `;
+                grid.appendChild(item);
             });
         }
 
@@ -1253,164 +2463,8 @@
                 .replace(/'/g, '&#039;');
         }
 
-        // Modal and App Inventory Controller
-        let activeModalDeviceId = null;
-        let currentAppsList = [];
-        let currentAppFilter = 'all';
-
-        async function openAppsModal(deviceId, deviceTitle) {
-            activeModalDeviceId = deviceId;
-            document.getElementById('modal-device-title').innerText = `Installed Applications - ${deviceTitle || 'Device'}`;
-            document.getElementById('modal-device-subtitle').innerText = `Device ID: ${deviceId}`;
-            document.getElementById('apps-modal').style.display = 'flex';
-            document.getElementById('app-search-input').value = '';
-            currentAppFilter = 'all';
-            updateFilterTabsUI();
-
-            const dev = registeredDevices[deviceId];
-            if (dev && dev.apps && dev.apps.length > 0) {
-                currentAppsList = dev.apps;
-                renderAppsGrid();
-            } else {
-                await fetchAppsForDevice(deviceId);
-            }
-        }
-
-        async function fetchAppsForDevice(deviceId) {
-            const grid = document.getElementById('apps-grid-content');
-            grid.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #71717a;">Loading applications from device...</div>';
-
-            try {
-                const res = await fetch(`/api/devices/${encodeURIComponent(deviceId)}/apps`, {
-                    headers: { "Authorization": `Bearer ${authToken}` }
-                });
-                const data = await res.json();
-                if (data.success && data.apps && data.apps.length > 0) {
-                    currentAppsList = data.apps;
-                    if (registeredDevices[deviceId]) {
-                        registeredDevices[deviceId].apps = data.apps;
-                    }
-                    renderAppsGrid();
-                } else {
-                    grid.innerHTML = `
-                        <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #a1a1aa;">
-                            <p style="margin-bottom: 12px; font-size: 13px;">No applications cached yet for this device.</p>
-                            <button class="btn btn-primary" onclick="requestAppRefresh()" style="display: inline-flex; width: auto; font-size: 12px; padding: 8px 16px;">
-                                Request Apps from Device Now
-                            </button>
-                        </div>`;
-                }
-            } catch (err) {
-                grid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #ef4444;">Failed to load apps: ${escapeHtml(err.message)}</div>`;
-            }
-        }
-
-        async function requestAppRefresh() {
-            if (!activeModalDeviceId) return;
-            const btnText = document.getElementById('refresh-btn-text');
-            const originalText = btnText.innerText;
-            btnText.innerText = 'Requesting...';
-
-            try {
-                await fetch(`/api/devices/${encodeURIComponent(activeModalDeviceId)}/command`, {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${authToken}`
-                    },
-                    body: JSON.stringify({ command: 'GET_APPS' })
-                });
-                btnText.innerText = 'Sent! Waiting sync...';
-                setTimeout(() => {
-                    btnText.innerText = originalText;
-                }, 3000);
-            } catch (err) {
-                alert('Failed to send refresh command: ' + err.message);
-                btnText.innerText = originalText;
-            }
-        }
-
-        function closeAppsModal() {
-            document.getElementById('apps-modal').style.display = 'none';
-            activeModalDeviceId = null;
-        }
-
-        function handleModalBackdropClick(event) {
-            if (event.target.id === 'apps-modal') {
-                closeAppsModal();
-            }
-        }
-
-        function setAppFilter(filter) {
-            currentAppFilter = filter;
-            updateFilterTabsUI();
-            renderAppsGrid();
-        }
-
-        function updateFilterTabsUI() {
-            ['all', 'user', 'system'].forEach(f => {
-                const btn = document.getElementById(`filter-${f}`);
-                if (btn) {
-                    if (f === currentAppFilter) btn.classList.add('active');
-                    else btn.classList.remove('active');
-                }
-            });
-        }
-
-        function filterApps() {
-            renderAppsGrid();
-        }
-
-        function renderAppsGrid() {
-            const query = (document.getElementById('app-search-input').value || '').trim().toLowerCase();
-            const grid = document.getElementById('apps-grid-content');
-
-            let userCount = 0;
-            let systemCount = 0;
-            currentAppsList.forEach(app => {
-                if (app.isSystem) systemCount++;
-                else userCount++;
-            });
-
-            document.getElementById('count-all').innerText = currentAppsList.length;
-            document.getElementById('count-user').innerText = userCount;
-            document.getElementById('count-system').innerText = systemCount;
-
-            const filtered = currentAppsList.filter(app => {
-                // Filter tab check
-                if (currentAppFilter === 'user' && app.isSystem) return false;
-                if (currentAppFilter === 'system' && !app.isSystem) return false;
-
-                // Search query check
-                if (query) {
-                    const matchName = (app.name || '').toLowerCase().includes(query);
-                    const matchPkg = (app.packageName || '').toLowerCase().includes(query);
-                    return matchName || matchPkg;
-                }
-                return true;
-            });
-
-            if (filtered.length === 0) {
-                grid.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #71717a;">No applications match your filter.</div>';
-                return;
-            }
-
-            grid.innerHTML = filtered.map(app => `
-                <div class="app-item">
-                    ${app.icon ? `<img src="${app.icon}" alt="${escapeHtml(app.name)}" onerror="this.style.display='none'">` : `<div style="width: 44px; height: 44px; border-radius: 10px; background: #27272a; display: flex; align-items: center; justify-content: center; font-size: 18px;">📱</div>`}
-                    <div class="app-item-info">
-                        <div class="app-item-name" title="${escapeHtml(app.name)}">${escapeHtml(app.name)}</div>
-                        <div class="app-item-pkg" title="${escapeHtml(app.packageName)}">${escapeHtml(app.packageName)}</div>
-                        <div class="app-item-version">
-                            <span>v${escapeHtml(app.version || '1.0')}</span>
-                            ${app.isSystem ? '<span style="margin-left: 6px; padding: 1px 5px; background: #27272a; color: #a1a1aa; border-radius: 3px; font-size: 9px; font-weight: 600;">SYSTEM</span>' : '<span style="margin-left: 6px; padding: 1px 5px; background: rgba(37, 99, 235, 0.2); color: #60a5fa; border-radius: 3px; font-size: 9px; font-weight: 600;">USER</span>'}
-                        </div>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        // Initialize QR on load
+        // Initialize tenant UI and QR on start
+        updateTenantUI();
         generateEnrollmentQr();
     </script>
 </body>
