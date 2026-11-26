@@ -273,8 +273,12 @@
         // Clean any legacy localStorage tokens
         localStorage.removeItem('prithon_token');
 
+        const loginForm = document.getElementById('loginForm');
         const errorBanner = document.getElementById('errorBanner');
         const errorMsg = document.getElementById('errorMsg');
+        const btnSubmit = document.getElementById('btnSubmit');
+        const btnSpinner = document.getElementById('btnSpinner');
+        const btnText = document.getElementById('btnText');
         const urlParams = new URLSearchParams(window.location.search);
 
         if (urlParams.get('expired') === '1') {
@@ -291,13 +295,6 @@
                 })
                 .catch(() => {});
         }
-
-        const loginForm = document.getElementById('loginForm');
-        const errorBanner = document.getElementById('errorBanner');
-        const errorMsg = document.getElementById('errorMsg');
-        const btnSubmit = document.getElementById('btnSubmit');
-        const btnSpinner = document.getElementById('btnSpinner');
-        const btnText = document.getElementById('btnText');
 
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
