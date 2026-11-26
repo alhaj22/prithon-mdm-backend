@@ -404,6 +404,56 @@ app.get('/api/provisioning-payload', async (req, res) => {
     });
 });
 
+app.get('/api/provisioning-profile', async (req, res) => {
+    let token = req.headers['authorization'];
+    let user = null;
+    if (token) {
+        if (token.startsWith('Bearer ')) token = token.slice(7);
+        try {
+            user = jwt.verify(token, JWT_SECRET);
+        } catch (e) {}
+    }
+
+    const { ssid, password, host } = req.query;
+    const proto = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+    const reqHost = req.headers['x-forwarded-host'] || req.headers.host;
+    const activeHost = host || reqHost || `${SERVER_HOST}:${PORT}`;
+    const baseOrigin = activeHost.startsWith('http') ? activeHost : `${proto}://${activeHost}`;
+
+    const downloadLocation = `${baseOrigin}/download/app-release.apk`;
+    const signatureChecksum = getApkSignatureChecksum();
+
+    let resolvedTenantId = user ? (user.id || user.tenantId) : null;
+    let resolvedTenantCode = user ? user.tenantCode : null;
+
+    if (!resolvedTenantCode && req.query.tenantCode) {
+        const tenant = await findTenantByCode(req.query.tenantCode);
+        if (tenant) {
+            resolvedTenantId = tenant.id;
+            resolvedTenantCode = tenant.tenantCode;
+        }
+    }
+
+    const payload = {
+        "android.app.extra.PROVISIONING_DEVICE_ADMIN_COMPONENT_NAME": "com.prithon.dpc/com.prithon.dpc.receivers.PrithonAdminReceiver",
+        "android.app.extra.PROVISIONING_DEVICE_ADMIN_SIGNATURE_CHECKSUM": signatureChecksum,
+        "android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_DOWNLOAD_LOCATION": downloadLocation,
+        "android.app.extra.PROVISIONING_MODE": 1,
+        "android.app.extra.PROVISIONING_ADMIN_EXTRAS_BUNDLE": {
+            "tenantId": resolvedTenantId || "",
+            "tenantCode": resolvedTenantCode || "",
+            "serverUrl": baseOrigin
+        }
+    };
+
+    if (ssid && ssid.trim().length > 0) {
+        payload["android.app.extra.PROVISIONING_WIFI_SSID"] = ssid.trim();
+        payload["android.app.extra.PROVISIONING_WIFI_PASSWORD"] = password || "";
+    }
+
+    res.json(payload);
+});
+
 // ==========================================
 // MULTI-TENANT DEVICE MANAGEMENT APIs
 // ==========================================

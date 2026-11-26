@@ -2552,13 +2552,17 @@
         // Provisioning 6-Tap QR Code
         async function generateEnrollmentQr() {
             const container = document.getElementById('qr-target');
-            container.innerHTML = '';
+            container.innerHTML = '<div style="color:var(--text-muted); font-size:12px;">Generating QR Code...</div>';
 
             try {
-                const res = await fetch('/api/provisioning-profile', {
+                const queryCode = currentTenantCode ? `?tenantCode=${encodeURIComponent(currentTenantCode)}` : '';
+                const res = await fetch(`/api/provisioning-profile${queryCode}`, {
                     headers: { "Authorization": `Bearer ${authToken}` }
                 });
-                const config = await res.json();
+                const data = await res.json();
+                const config = data.payload || data;
+
+                container.innerHTML = '';
 
                 const ssid = document.getElementById('wifi-ssid').value.trim();
                 const pass = document.getElementById('wifi-pass').value.trim();
@@ -2567,14 +2571,14 @@
 
                 new QRCode(container, {
                     text: JSON.stringify(config),
-                    width: 200,
-                    height: 200,
+                    width: 220,
+                    height: 220,
                     colorDark: "#0f172a",
                     colorLight: "#ffffff",
                     correctLevel: QRCode.CorrectLevel.M
                 });
             } catch (e) {
-                container.innerText = "Error generating enrollment profile.";
+                container.innerHTML = `<span style="color:#ef4444; font-size:12px;">Error generating enrollment profile: ${e.message}</span>`;
             }
         }
 
