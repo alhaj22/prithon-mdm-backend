@@ -4,13 +4,13 @@ const { findTenantById } = require('../models/tenantStore');
 const JWT_SECRET = process.env.JWT_SECRET || 'prithon_enterprise_mdm_secret_key_2026';
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || (JWT_SECRET + '_refresh_2026');
 
-// Cookie security configurations (Set to 1 min Access Token & 2 min Refresh Token for testing)
+// Cookie security configurations (7 Days Access Token & 30 Days Refresh Token)
 const COOKIE_OPTIONS_ACCESS = {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
-    maxAge: 1 * 60 * 1000 // 1 minute (60 seconds)
+    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 Days
 };
 
 const COOKIE_OPTIONS_REFRESH = {
@@ -18,7 +18,7 @@ const COOKIE_OPTIONS_REFRESH = {
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
-    maxAge: 2 * 60 * 1000 // 2 minutes (120 seconds)
+    maxAge: 30 * 24 * 60 * 60 * 1000 // 30 Days
 };
 
 function generateAccessToken(tenant) {
@@ -43,7 +43,7 @@ function generateAccessToken(tenant) {
             tokenType: 'access'
         },
         JWT_SECRET,
-        { expiresIn: '1m' } // 1 minute
+        { expiresIn: '7d' } // 7 Days
     );
 }
 
@@ -58,7 +58,7 @@ function generateRefreshToken(tenant) {
             tokenType: 'refresh'
         },
         JWT_REFRESH_SECRET,
-        { expiresIn: '2m' } // 2 minutes
+        { expiresIn: '30d' } // 30 Days
     );
 }
 
@@ -112,19 +112,17 @@ function clearAuthCookies(res) {
 }
 
 async function authMiddleware(req, res, next) {
-    // 1. Strict 2-minute session boundary: Refresh Token MUST be present and valid
+    // 1. Check Refresh Token from Cookies (30 days validity boundary)
     const refreshToken = req.cookies?.refreshToken || req.cookies?.refresh_token;
     if (!refreshToken) {
-        console.log('[AUTH DEBUG] No refresh token in cookies. Terminating session.');
         clearAuthCookies(res);
         return res.status(401).json({ error: 'Session expired. Please log in again.' });
     }
 
     const decodedRefresh = verifyRefreshToken(refreshToken);
     if (!decodedRefresh) {
-        console.log('[AUTH DEBUG] Refresh Token expired (2m lifetime reached). Auto logout triggered!');
         clearAuthCookies(res);
-        return res.status(401).json({ error: 'Session expired after 2 minutes. Please log in again.' });
+        return res.status(401).json({ error: 'Session expired after 30 days. Please log in again.' });
     }
 
     const targetId = decodedRefresh.companyId || decodedRefresh.id || decodedRefresh.tenantId;
@@ -134,7 +132,7 @@ async function authMiddleware(req, res, next) {
         return res.status(401).json({ error: 'Company account not found.' });
     }
 
-    // 2. Check 1-minute Access Token
+    // 2. Check 7-day Access Token
     let accessToken = req.cookies?.accessToken || req.cookies?.access_token;
     if (!accessToken && req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
         accessToken = req.headers.authorization.split(' ')[1];
@@ -146,15 +144,13 @@ async function authMiddleware(req, res, next) {
             req.user = tenant;
             return next();
         }
-        console.log('[AUTH DEBUG] Access Token expired (1m reached). Silently refreshing using valid Refresh Token...');
     }
 
-    // 3. Access Token expired/missing, but Refresh Token is valid -> Silent refresh
+    // 3. Access Token expired/missing, but Refresh Token is valid -> Transparent silent refresh (issues new 7-day access token)
     const newAccessToken = generateAccessToken(tenant);
     res.cookie('accessToken', newAccessToken, COOKIE_OPTIONS_ACCESS);
     res.cookie('prithon_token', newAccessToken, COOKIE_OPTIONS_ACCESS);
     req.user = tenant;
-    console.log(`[AUTH DEBUG] Silently refreshed 1m Access Token for: ${tenant.companyName || tenant.email}`);
     return next();
 }
 
