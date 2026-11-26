@@ -2003,11 +2003,13 @@
             const userDispEl = document.getElementById("user-display-name");
             const avatarEl = document.getElementById("avatar-initial");
 
-            if (shopNameEl) shopNameEl.innerText = currentUser.shopName || "Enterprise Shop";
+            const displayName = currentUser.userName || currentUser.ownerName || currentUser.company || currentUser.shopName || "Admin";
+            const companyName = currentUser.company || currentUser.shopName || "Enterprise Workspace";
+            if (shopNameEl) shopNameEl.innerText = companyName;
             if (codeEl) codeEl.innerText = currentUser.tenantCode || "ACTIVE";
             if (codeQrEl) codeQrEl.innerText = currentUser.tenantCode || "ACTIVE";
-            if (userDispEl) userDispEl.innerText = currentUser.shopName || "Admin";
-            if (avatarEl && currentUser.shopName) avatarEl.innerText = currentUser.shopName.charAt(0).toUpperCase();
+            if (userDispEl) userDispEl.innerText = displayName;
+            if (avatarEl) avatarEl.innerText = (displayName || "A").charAt(0).toUpperCase();
         }
 
         document.getElementById("btn-logout")?.addEventListener("click", () => {

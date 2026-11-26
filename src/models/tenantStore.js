@@ -42,10 +42,16 @@ function generateTenantCode(shopName) {
     return `${prefix}-${randomDigits}`;
 }
 
-async function createTenant({ shopName, ownerName, email, phone, password }) {
+async function createTenant({ shopName, ownerName, userName, email, phone, password, company, city, address }) {
     const normalizedEmail = email.trim().toLowerCase();
+    const resolvedCompany = (company || shopName || '').trim();
+    const resolvedUserName = (userName || ownerName || '').trim();
+    const resolvedCity = (city || '').trim();
+    const resolvedAddress = (address || '').trim();
+    const resolvedPhone = (phone || '').trim();
+
     const tenantId = `tenant_${crypto.randomBytes(8).toString('hex')}`;
-    let tenantCode = generateTenantCode(shopName);
+    let tenantCode = generateTenantCode(resolvedCompany || resolvedUserName);
 
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
@@ -59,16 +65,22 @@ async function createTenant({ shopName, ownerName, email, phone, password }) {
             }
 
             const res = await db.query(`
-                INSERT INTO tenants (id, shop_name, owner_name, email, phone, tenant_code, password_hash, credits)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-                RETURNING id, shop_name as "shopName", owner_name as "ownerName", email, phone, tenant_code as "tenantCode", credits, created_at as "createdAt"
-            `, [tenantId, shopName.trim(), ownerName.trim(), normalizedEmail, (phone || '').trim(), tenantCode, passwordHash, 20]);
+                INSERT INTO tenants (id, shop_name, owner_name, email, phone, tenant_code, password_hash, credits, company, user_name, city, address)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                RETURNING id, shop_name as "shopName", owner_name as "ownerName", company, user_name as "userName", email, phone, city, address, tenant_code as "tenantCode", credits, created_at as "createdAt"
+            `, [tenantId, resolvedCompany, resolvedUserName, normalizedEmail, resolvedPhone, tenantCode, passwordHash, 20, resolvedCompany, resolvedUserName, resolvedCity, resolvedAddress]);
+
+            const row = res.rows[0];
+            row.shopName = row.company || row.shopName;
+            row.ownerName = row.userName || row.ownerName;
+            row.userName = row.userName || row.ownerName;
+            row.company = row.company || row.shopName;
 
             // Also keep fallback updated
-            fallbackTenants[tenantId] = { ...res.rows[0], passwordHash };
+            fallbackTenants[tenantId] = { ...row, passwordHash };
             saveFallbackTenants();
 
-            return res.rows[0];
+            return row;
         } catch (err) {
             if (err.message.includes('already exists')) throw err;
             console.warn('[POSTGRES] createTenant fallback to local store:', err.message);
@@ -85,10 +97,14 @@ async function createTenant({ shopName, ownerName, email, phone, password }) {
 
     const safeTenant = {
         id: tenantId,
-        shopName: shopName.trim(),
-        ownerName: ownerName.trim(),
+        shopName: resolvedCompany,
+        ownerName: resolvedUserName,
+        company: resolvedCompany,
+        userName: resolvedUserName,
         email: normalizedEmail,
-        phone: (phone || '').trim(),
+        phone: resolvedPhone,
+        city: resolvedCity,
+        address: resolvedAddress,
         tenantCode,
         credits: 20,
         createdAt: new Date().toISOString()
@@ -105,7 +121,7 @@ async function authenticateTenant(email, password) {
     if (db.isPostgresConnected()) {
         try {
             const res = await db.query(`
-                SELECT id, shop_name as "shopName", owner_name as "ownerName", email, phone, tenant_code as "tenantCode", password_hash as "passwordHash", credits, created_at as "createdAt"
+                SELECT id, shop_name as "shopName", owner_name as "ownerName", company, user_name as "userName", email, phone, city, address, tenant_code as "tenantCode", password_hash as "passwordHash", credits, created_at as "createdAt"
                 FROM tenants
                 WHERE email = $1
             `, [normalizedEmail]);
@@ -115,6 +131,10 @@ async function authenticateTenant(email, password) {
                 const isMatch = await bcrypt.compare(password, tenant.passwordHash);
                 if (!isMatch) throw new Error('Invalid email or password.');
                 const { passwordHash: _, ...safeTenant } = tenant;
+                safeTenant.shopName = safeTenant.company || safeTenant.shopName;
+                safeTenant.ownerName = safeTenant.userName || safeTenant.ownerName;
+                safeTenant.userName = safeTenant.userName || safeTenant.ownerName;
+                safeTenant.company = safeTenant.company || safeTenant.shopName;
                 return safeTenant;
             }
         } catch (err) {
@@ -138,6 +158,10 @@ async function authenticateTenant(email, password) {
     if (!isMatch) throw new Error('Invalid email or password.');
 
     const { passwordHash: _, ...safeTenant } = tenant;
+    safeTenant.shopName = safeTenant.company || safeTenant.shopName;
+    safeTenant.ownerName = safeTenant.userName || safeTenant.ownerName;
+    safeTenant.userName = safeTenant.userName || safeTenant.ownerName;
+    safeTenant.company = safeTenant.company || safeTenant.shopName;
     return safeTenant;
 }
 
@@ -145,10 +169,17 @@ async function findTenantById(tenantId) {
     if (db.isPostgresConnected()) {
         try {
             const res = await db.query(`
-                SELECT id, shop_name as "shopName", owner_name as "ownerName", email, phone, tenant_code as "tenantCode", credits, created_at as "createdAt"
+                SELECT id, shop_name as "shopName", owner_name as "ownerName", company, user_name as "userName", email, phone, city, address, tenant_code as "tenantCode", credits, created_at as "createdAt"
                 FROM tenants WHERE id = $1
             `, [tenantId]);
-            if (res.rows.length > 0) return res.rows[0];
+            if (res.rows.length > 0) {
+                const row = res.rows[0];
+                row.shopName = row.company || row.shopName;
+                row.ownerName = row.userName || row.ownerName;
+                row.userName = row.userName || row.ownerName;
+                row.company = row.company || row.shopName;
+                return row;
+            }
         } catch (e) {}
     }
 
@@ -156,6 +187,10 @@ async function findTenantById(tenantId) {
     const t = fallbackTenants[tenantId];
     if (!t) return null;
     const { passwordHash: _, ...safeTenant } = t;
+    safeTenant.shopName = safeTenant.company || safeTenant.shopName;
+    safeTenant.ownerName = safeTenant.userName || safeTenant.ownerName;
+    safeTenant.userName = safeTenant.userName || safeTenant.ownerName;
+    safeTenant.company = safeTenant.company || safeTenant.shopName;
     return safeTenant;
 }
 
@@ -165,10 +200,17 @@ async function findTenantByCode(tenantCode) {
     if (db.isPostgresConnected()) {
         try {
             const res = await db.query(`
-                SELECT id, shop_name as "shopName", owner_name as "ownerName", email, phone, tenant_code as "tenantCode", credits, created_at as "createdAt"
+                SELECT id, shop_name as "shopName", owner_name as "ownerName", company, user_name as "userName", email, phone, city, address, tenant_code as "tenantCode", credits, created_at as "createdAt"
                 FROM tenants WHERE UPPER(tenant_code) = $1
             `, [normalized]);
-            if (res.rows.length > 0) return res.rows[0];
+            if (res.rows.length > 0) {
+                const row = res.rows[0];
+                row.shopName = row.company || row.shopName;
+                row.ownerName = row.userName || row.ownerName;
+                row.userName = row.userName || row.ownerName;
+                row.company = row.company || row.shopName;
+                return row;
+            }
         } catch (e) {}
     }
 
@@ -176,6 +218,10 @@ async function findTenantByCode(tenantCode) {
     for (const id in fallbackTenants) {
         if (fallbackTenants[id].tenantCode === normalized) {
             const { passwordHash: _, ...safeTenant } = fallbackTenants[id];
+            safeTenant.shopName = safeTenant.company || safeTenant.shopName;
+            safeTenant.ownerName = safeTenant.userName || safeTenant.ownerName;
+            safeTenant.userName = safeTenant.userName || safeTenant.ownerName;
+            safeTenant.company = safeTenant.company || safeTenant.shopName;
             return safeTenant;
         }
     }

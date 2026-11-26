@@ -56,11 +56,11 @@
 
         .auth-container {
             width: 100%;
-            max-width: 480px;
+            max-width: 580px;
             background: var(--bg-surface);
             border: 1px solid var(--border-subtle);
             border-radius: 20px;
-            padding: 40px;
+            padding: 36px;
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 30px rgba(0, 229, 255, 0.04);
             position: relative;
             z-index: 1;
@@ -69,7 +69,7 @@
 
         .brand-header {
             text-align: center;
-            margin-bottom: 28px;
+            margin-bottom: 24px;
         }
 
         .brand-logo {
@@ -245,8 +245,8 @@
             <div class="brand-logo">
                 <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
             </div>
-            <h1 class="brand-title">Create Shop Account</h1>
-            <p class="brand-subtitle">Get your isolated device management workspace</p>
+            <h1 class="brand-title">Admin Registration</h1>
+            <p class="brand-subtitle">Setup your enterprise mobile device management console</p>
         </div>
 
         <div style="text-align: center;">
@@ -258,35 +258,57 @@
         </div>
 
         <form id="signupForm">
-            <div class="form-group">
-                <label class="form-label" for="shopName">Shop / Company Name *</label>
-                <input class="form-input" type="text" id="shopName" required placeholder="e.g. Apex Mobile Care" autocomplete="organization">
-            </div>
-
+            <!-- Row 1: User Name & Company -->
             <div class="form-row">
                 <div class="form-group">
-                    <label class="form-label" for="ownerName">Owner Name *</label>
-                    <input class="form-input" type="text" id="ownerName" required placeholder="e.g. Rajesh Sharma" autocomplete="name">
+                    <label class="form-label" for="userName">User Name *</label>
+                    <input class="form-input" type="text" id="userName" required placeholder="e.g. Alhaj Khan" autocomplete="name">
                 </div>
                 <div class="form-group">
-                    <label class="form-label" for="phone">Mobile Number</label>
-                    <input class="form-input" type="tel" id="phone" placeholder="9876543210" autocomplete="tel">
+                    <label class="form-label" for="company">Company *</label>
+                    <input class="form-input" type="text" id="company" required placeholder="e.g. Prithon Enterprise" autocomplete="organization">
                 </div>
             </div>
 
-            <div class="form-group">
-                <label class="form-label" for="email">Email Address *</label>
-                <input class="form-input" type="email" id="email" required placeholder="rajesh@apexmobiles.com" autocomplete="email">
+            <!-- Row 2: Email & Phone No -->
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label" for="email">Email *</label>
+                    <input class="form-input" type="email" id="email" required placeholder="e.g. admin@prithon.com" autocomplete="email">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="phone">Phone No *</label>
+                    <input class="form-input" type="tel" id="phone" required placeholder="e.g. 9876543210" autocomplete="tel">
+                </div>
             </div>
 
-            <div class="form-group">
-                <label class="form-label" for="password">Password (Minimum 6 characters) *</label>
-                <input class="form-input" type="password" id="password" required minlength="6" placeholder="••••••••" autocomplete="new-password">
+            <!-- Row 3: Password & Confirm Password -->
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label" for="password">Password *</label>
+                    <input class="form-input" type="password" id="password" required minlength="6" placeholder="••••••••" autocomplete="new-password">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="confirmPassword">Confirm Password *</label>
+                    <input class="form-input" type="password" id="confirmPassword" required minlength="6" placeholder="••••••••" autocomplete="new-password">
+                </div>
+            </div>
+
+            <!-- Row 4: City & Address -->
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label" for="city">City *</label>
+                    <input class="form-input" type="text" id="city" required placeholder="e.g. Mumbai" autocomplete="address-level2">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="address">Address *</label>
+                    <input class="form-input" type="text" id="address" required placeholder="e.g. 102, Central Park, Link Road" autocomplete="street-address">
+                </div>
             </div>
 
             <button type="submit" id="btnSubmit" class="btn-submit">
                 <div id="btnSpinner" class="spinner"></div>
-                <span id="btnText">Create Account &amp; Access Dashboard</span>
+                <span id="btnText">Register Admin &amp; Access Dashboard</span>
             </button>
         </form>
 
@@ -308,11 +330,20 @@
             e.preventDefault();
             errorBanner.style.display = 'none';
 
-            const shopName = document.getElementById('shopName').value.trim();
-            const ownerName = document.getElementById('ownerName').value.trim();
-            const phone = document.getElementById('phone').value.trim();
+            const userName = document.getElementById('userName').value.trim();
+            const company = document.getElementById('company').value.trim();
             const email = document.getElementById('email').value.trim();
+            const phone = document.getElementById('phone').value.trim();
             const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            const city = document.getElementById('city').value.trim();
+            const address = document.getElementById('address').value.trim();
+
+            if (!userName || !company || !email || !phone || !city || !address) {
+                errorMsg.innerText = 'Please fill out all required fields.';
+                errorBanner.style.display = 'flex';
+                return;
+            }
 
             if (password.length < 6) {
                 errorMsg.innerText = 'Password must be at least 6 characters.';
@@ -320,15 +351,30 @@
                 return;
             }
 
+            if (password !== confirmPassword) {
+                errorMsg.innerText = 'Password and Confirm Password do not match.';
+                errorBanner.style.display = 'flex';
+                return;
+            }
+
             btnSubmit.disabled = true;
             btnSpinner.style.display = 'block';
-            btnText.innerText = 'Creating Workspace...';
+            btnText.innerText = 'Creating Admin Workspace...';
 
             try {
                 const response = await fetch('/api/auth/signup', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ shopName, ownerName, phone, email, password })
+                    body: JSON.stringify({
+                        userName,
+                        company,
+                        email,
+                        phone,
+                        password,
+                        confirmPassword,
+                        city,
+                        address
+                    })
                 });
 
                 const data = await response.json();
@@ -341,14 +387,14 @@
                 localStorage.setItem('prithon_token', data.token);
                 localStorage.setItem('prithon_user', JSON.stringify(data.user));
 
-                btnText.innerText = 'Setting Up Fleet...';
+                btnText.innerText = 'Redirecting to Dashboard...';
                 window.location.replace('/dashboard');
             } catch (err) {
                 errorMsg.innerText = err.message || 'Signup failed. Please try again.';
                 errorBanner.style.display = 'flex';
                 btnSubmit.disabled = false;
                 btnSpinner.style.display = 'none';
-                btnText.innerText = 'Create Account & Access Dashboard';
+                btnText.innerText = 'Register Admin & Access Dashboard';
             }
         });
     </script>

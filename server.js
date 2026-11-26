@@ -251,15 +251,38 @@ function emitTenantDeviceUpdate(tenantId) {
 // 1. Retailer Signup
 app.post('/api/auth/signup', async (req, res) => {
     try {
-        const { shopName, ownerName, email, phone, password } = req.body;
-        if (!shopName || !ownerName || !email || !password) {
-            return res.status(400).json({ error: 'Shop Name, Owner Name, Email, and Password are required.' });
+        const { userName, ownerName, email, password, confirmPassword, phone, company, shopName, city, address } = req.body;
+        const resolvedUserName = (userName || ownerName || '').trim();
+        const resolvedCompany = (company || shopName || '').trim();
+        const resolvedEmail = (email || '').trim().toLowerCase();
+
+        if (!resolvedUserName) {
+            return res.status(400).json({ error: 'User Name is required.' });
         }
-        if (password.length < 6) {
+        if (!resolvedEmail) {
+            return res.status(400).json({ error: 'Email is required.' });
+        }
+        if (!password || password.length < 6) {
             return res.status(400).json({ error: 'Password must be at least 6 characters.' });
         }
+        if (confirmPassword && password !== confirmPassword) {
+            return res.status(400).json({ error: 'Passwords do not match.' });
+        }
+        if (!resolvedCompany) {
+            return res.status(400).json({ error: 'Company name is required.' });
+        }
 
-        const tenant = await createTenant({ shopName, ownerName, email, phone, password });
+        const tenant = await createTenant({
+            userName: resolvedUserName,
+            ownerName: resolvedUserName,
+            email: resolvedEmail,
+            password,
+            phone: (phone || '').trim(),
+            company: resolvedCompany,
+            shopName: resolvedCompany,
+            city: (city || '').trim(),
+            address: (address || '').trim()
+        });
         const token = generateToken(tenant);
 
         res.cookie('prithon_token', token, {

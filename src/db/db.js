@@ -50,6 +50,12 @@ async function initDatabase() {
             );
             CREATE INDEX IF NOT EXISTS idx_tenants_code ON tenants(tenant_code);
             CREATE INDEX IF NOT EXISTS idx_tenants_email ON tenants(email);
+
+            -- Auto-migration: Enterprise Profile Columns
+            ALTER TABLE tenants ADD COLUMN IF NOT EXISTS city VARCHAR(128);
+            ALTER TABLE tenants ADD COLUMN IF NOT EXISTS address TEXT;
+            ALTER TABLE tenants ADD COLUMN IF NOT EXISTS company VARCHAR(255);
+            ALTER TABLE tenants ADD COLUMN IF NOT EXISTS user_name VARCHAR(255);
         `);
 
         // 2. Create Devices Table (with JSONB support for apps inventory & telemetry)
