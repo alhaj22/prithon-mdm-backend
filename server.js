@@ -10,8 +10,30 @@ const os = require('os');
 const cookieParser = require('cookie-parser');
 
 const { createTenant, authenticateTenant, findTenantById, findTenantByCode } = require('./src/models/tenantStore');
-const { generateToken, verifyToken, authMiddleware } = require('./src/middleware/auth');
+const {
+    generateAccessToken,
+    generateRefreshToken,
+    verifyAccessToken,
+    verifyRefreshToken,
+    generateToken,
+    verifyToken,
+    setAuthCookies,
+    clearAuthCookies,
+    authMiddleware
+} = require('./src/middleware/auth');
 const db = require('./src/db/db');
+
+function parseCookieString(str) {
+    const cookies = {};
+    if (!str) return cookies;
+    str.split(';').forEach(pair => {
+        const parts = pair.split('=');
+        const key = parts[0]?.trim();
+        const val = parts.slice(1).join('=').trim();
+        if (key) cookies[key] = decodeURIComponent(val);
+    });
+    return cookies;
+}
 
 const app = express();
 app.use(cors({ origin: true, credentials: true }));
@@ -30,6 +52,10 @@ app.get('/signup', (req, res) => {
 });
 
 app.get('/dashboard', (req, res) => {
+    const token = req.cookies?.accessToken || req.cookies?.access_token || req.cookies?.refreshToken || req.cookies?.refresh_token || req.cookies?.prithon_token;
+    if (!token) {
+        return res.redirect('/login');
+    }
     res.sendFile(path.join(__dirname, 'src', 'public', 'dashboard.html'));
 });
 
@@ -441,7 +467,9 @@ app.post('/api/auth/signup', async (req, res) => {
             city: (city || '').trim(),
             address: (address || '').trim()
         });
-        const token = generateToken(tenant);
+
+        // Set HttpOnly Access Token (15m) and Refresh Token (30d) in Cookies
+        const { accessToken } = setAuthCookies(res, tenant);
 
         await logAudit({
             companyId: tenant.id,
@@ -450,17 +478,9 @@ app.post('/api/auth/signup', async (req, res) => {
             payload: { company: tenant.companyName, email: tenant.email, userName: tenant.userName }
         });
 
-        res.cookie('prithon_token', token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            maxAge: 30 * 24 * 60 * 60 * 1000
-        });
-
         res.status(201).json({
             success: true,
             message: 'Company account created successfully.',
-            token,
             user: tenant
         });
     } catch (err) {
@@ -478,7 +498,9 @@ app.post('/api/auth/login', async (req, res) => {
         }
 
         const tenant = await authenticateTenant(email, password);
-        const token = generateToken(tenant);
+
+        // Set HttpOnly Access Token (15m) and Refresh Token (30d) in Cookies
+        const { accessToken } = setAuthCookies(res, tenant);
 
         await logAudit({
             companyId: tenant.id,
@@ -487,21 +509,42 @@ app.post('/api/auth/login', async (req, res) => {
             payload: { email: tenant.email, company: tenant.companyName, userName: tenant.userName }
         });
 
-        res.cookie('prithon_token', token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            maxAge: 30 * 24 * 60 * 60 * 1000
-        });
-
         res.json({
             success: true,
             message: 'Login successful.',
-            token,
             user: tenant
         });
     } catch (err) {
         res.status(401).json({ error: err.message || 'Authentication failed.' });
+    }
+});
+
+// 2.1 Refresh Token Endpoint
+app.post('/api/auth/refresh', async (req, res) => {
+    try {
+        const refreshToken = req.cookies?.refreshToken || req.cookies?.refresh_token;
+        if (!refreshToken) {
+            return res.status(401).json({ error: 'Refresh token cookie not found.' });
+        }
+
+        const decoded = verifyRefreshToken(refreshToken);
+        if (!decoded) {
+            clearAuthCookies(res);
+            return res.status(401).json({ error: 'Invalid or expired refresh token. Please login again.' });
+        }
+
+        const targetId = decoded.companyId || decoded.id || decoded.tenantId;
+        const tenant = await findTenantById(targetId);
+        if (!tenant) {
+            clearAuthCookies(res);
+            return res.status(401).json({ error: 'Company account not found.' });
+        }
+
+        setAuthCookies(res, tenant);
+        res.json({ success: true, message: 'Session refreshed successfully.' });
+    } catch (err) {
+        clearAuthCookies(res);
+        res.status(401).json({ error: 'Failed to refresh token.' });
     }
 });
 
@@ -514,13 +557,13 @@ app.get('/api/auth/me', authMiddleware, (req, res) => {
 app.post('/api/auth/logout', (req, res) => {
     let user = null;
     try {
-        const token = req.cookies?.prithon_token || req.headers?.authorization?.replace('Bearer ', '');
-        if (token) user = jwt.verify(token, JWT_SECRET);
+        const token = req.cookies?.accessToken || req.cookies?.access_token || req.cookies?.prithon_token || req.headers?.authorization?.replace('Bearer ', '');
+        if (token) user = verifyToken(token);
     } catch (e) {}
     if (user) {
         logAudit({ companyId: user.companyId || user.id, eventType: 'ADMIN_LOGOUT', req, payload: { email: user.email } });
     }
-    res.clearCookie('prithon_token');
+    clearAuthCookies(res);
     res.json({ success: true, message: 'Logged out successfully.' });
 });
 
@@ -1201,15 +1244,23 @@ app.get('/terms', (req, res) => {
 
 io.on('connection', (socket) => {
     // Authenticated Dashboard joins its isolated tenant room
-    socket.on('join_tenant', ({ token }) => {
+    socket.on('join_tenant', (payload = {}) => {
+        let token = payload?.token;
+        if (!token && socket.handshake.headers.cookie) {
+            const parsed = parseCookieString(socket.handshake.headers.cookie);
+            token = parsed.accessToken || parsed.access_token || parsed.prithon_token || parsed.refreshToken || parsed.refresh_token;
+        }
         const decoded = verifyToken(token);
-        if (decoded && decoded.tenantId) {
-            const roomName = `tenant_${decoded.tenantId}`;
+        const tenantId = decoded ? (decoded.companyId || decoded.id || decoded.tenantId) : null;
+        if (tenantId) {
+            const roomName = `tenant_${tenantId}`;
             socket.join(roomName);
-            socket.tenantId = decoded.tenantId;
-            console.log(`[DASHBOARD JOINED] Tenant ${decoded.shopName} (${decoded.tenantCode}) joined room ${roomName}`);
+            socket.tenantId = tenantId;
+            const companyName = decoded.companyName || decoded.shopName || tenantId;
+            const companyCode = decoded.companyCode || decoded.tenantCode || '';
+            console.log(`[DASHBOARD JOINED] Company ${companyName} (${companyCode}) joined room ${roomName}`);
             // Send initial tenant device list
-            const tenantDevices = getTenantDevices(decoded.tenantId);
+            const tenantDevices = getTenantDevices(tenantId);
             socket.emit('device_list_updated', tenantDevices);
         }
     });

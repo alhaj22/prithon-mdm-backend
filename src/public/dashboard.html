@@ -2047,35 +2047,58 @@
     </div>
 
     <script>
-        // Mandatory Auth check
-        const authToken = localStorage.getItem("prithon_token");
-        if (!authToken) {
-            window.location.replace("/login");
-        }
+        // Clean legacy localStorage tokens
+        localStorage.removeItem("prithon_token");
 
         let currentUser = null;
-        try {
-            currentUser = JSON.parse(localStorage.getItem("prithon_user"));
-        } catch (e) {}
+        let currentTenantCode = '';
 
         function updateTenantUI() {
             if (!currentUser) return;
+            currentTenantCode = currentUser.companyCode || currentUser.tenantCode || '';
             const shopNameEl = document.getElementById("tenant-shop-name");
             const codeEl = document.getElementById("display-tenant-code");
             const codeQrEl = document.getElementById("display-tenant-code-qr");
             const userDispEl = document.getElementById("user-display-name");
             const avatarEl = document.getElementById("avatar-initial");
 
-            const displayName = currentUser.userName || currentUser.ownerName || currentUser.company || currentUser.shopName || "Admin";
-            const companyName = currentUser.company || currentUser.shopName || "Enterprise Workspace";
+            const displayName = currentUser.userName || currentUser.ownerName || currentUser.companyName || currentUser.company || "Admin";
+            const companyName = currentUser.companyName || currentUser.company || currentUser.shopName || "Enterprise Workspace";
             if (shopNameEl) shopNameEl.innerText = companyName;
-            if (codeEl) codeEl.innerText = currentUser.tenantCode || "ACTIVE";
-            if (codeQrEl) codeQrEl.innerText = currentUser.tenantCode || "ACTIVE";
+            if (codeEl) codeEl.innerText = currentTenantCode || "ACTIVE";
+            if (codeQrEl) codeQrEl.innerText = currentTenantCode || "ACTIVE";
             if (userDispEl) userDispEl.innerText = displayName;
             if (avatarEl) avatarEl.innerText = (displayName || "A").charAt(0).toUpperCase();
         }
 
-        document.getElementById("btn-logout")?.addEventListener("click", () => {
+        // Verify active session via HttpOnly Cookie
+        async function verifySession() {
+            try {
+                const res = await fetch('/api/auth/me', { credentials: 'include' });
+                if (!res.ok) {
+                    window.location.replace('/login');
+                    return false;
+                }
+                const data = await res.json();
+                if (!data.success || !data.user) {
+                    window.location.replace('/login');
+                    return false;
+                }
+                currentUser = data.user;
+                updateTenantUI();
+                return true;
+            } catch (err) {
+                window.location.replace('/login');
+                return false;
+            }
+        }
+
+        verifySession();
+
+        document.getElementById("btn-logout")?.addEventListener("click", async () => {
+            try {
+                await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+            } catch (e) {}
             localStorage.removeItem("prithon_token");
             localStorage.removeItem("prithon_user");
             window.location.replace("/login");
@@ -2154,7 +2177,7 @@
 
         // Real-time WebSocket Gateway
         const socket = io({
-            auth: { token: authToken }
+            withCredentials: true
         });
 
         socket.on('connect', () => {
@@ -2162,7 +2185,7 @@
             const socketText = document.getElementById('socket-status-text');
             if (socketDot) socketDot.style.background = 'var(--success)';
             if (socketText) socketText.innerText = 'Connected';
-            socket.emit('join_tenant', { token: authToken });
+            socket.emit('join_tenant');
         });
 
         socket.on('disconnect', () => {
@@ -2473,7 +2496,7 @@
         // Fetch initial fleet via REST
         function refreshFleetData() {
             fetch('/api/devices', {
-                headers: { "Authorization": `Bearer ${authToken}` }
+                credentials: 'include'
             })
                 .then(res => res.json())
                 .then(devices => renderDeviceList(devices))
@@ -2488,9 +2511,9 @@
                 const res = await fetch(`/api/devices/${deviceId}/command`, {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${authToken}`
+                        'Content-Type': 'application/json'
                     },
+                    credentials: 'include',
                     body: JSON.stringify({ command })
                 });
                 const data = await res.json();
@@ -2523,7 +2546,7 @@
             try {
                 const res = await fetch(`/api/devices/${deviceId}`, {
                     method: 'DELETE',
-                    headers: { 'Authorization': `Bearer ${authToken}` }
+                    credentials: 'include'
                 });
                 const data = await res.json();
                 if (data.success) {
@@ -2626,7 +2649,7 @@
             try {
                 const queryCode = currentTenantCode ? `?tenantCode=${encodeURIComponent(currentTenantCode)}` : '';
                 const res = await fetch(`/api/provisioning-profile${queryCode}`, {
-                    headers: { "Authorization": `Bearer ${authToken}` }
+                    credentials: 'include'
                 });
                 const data = await res.json();
                 const config = data.payload || data;
@@ -2850,9 +2873,9 @@
                 const res = await fetch('/api/devices/wallpaper', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${authToken}`
+                        'Content-Type': 'application/json'
                     },
+                    credentials: 'include',
                     body: JSON.stringify(payload)
                 });
 
@@ -2883,9 +2906,9 @@
                 const res = await fetch('/api/devices/wallpaper/clear', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${authToken}`
+                        'Content-Type': 'application/json'
                     },
+                    credentials: 'include',
                     body: JSON.stringify({ deviceId: targetDevice })
                 });
                 const data = await res.json();
@@ -2902,7 +2925,7 @@
 
             try {
                 const res = await fetch('/api/audit-logs', {
-                    headers: { 'Authorization': `Bearer ${authToken}` }
+                    credentials: 'include'
                 });
                 const data = await res.json();
                 const logs = data.logs || [];

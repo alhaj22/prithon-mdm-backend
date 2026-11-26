@@ -534,6 +534,7 @@
                 const response = await fetch('/api/auth/signup', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
                     body: JSON.stringify({
                         userName,
                         company,
@@ -553,9 +554,8 @@
                     throw new Error(data.error || 'Registration failed');
                 }
 
-                // Store token and user details in localStorage
-                localStorage.setItem('prithon_token', data.token);
-                localStorage.setItem('prithon_user', JSON.stringify(data.user));
+                // Clean any legacy localStorage tokens
+                localStorage.removeItem('prithon_token');
 
                 showSuccess('Registration verified! Redirecting to dashboard...');
                 btnText.innerText = 'Redirecting to Dashboard...';

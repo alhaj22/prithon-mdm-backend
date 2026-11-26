@@ -270,12 +270,11 @@
     </div>
 
     <script>
-        // Check if already authenticated
-        const existingToken = localStorage.getItem('prithon_token');
-        if (existingToken) {
-            fetch('/api/auth/me', {
-                headers: { 'Authorization': `Bearer ${existingToken}` }
-            })
+        // Clean any legacy localStorage tokens
+        localStorage.removeItem('prithon_token');
+
+        // Check active session via HttpOnly Cookie
+        fetch('/api/auth/me', { credentials: 'include' })
             .then(res => res.json())
             .then(data => {
                 if (data.success && data.user) {
@@ -283,7 +282,6 @@
                 }
             })
             .catch(() => {});
-        }
 
         const loginForm = document.getElementById('loginForm');
         const errorBanner = document.getElementById('errorBanner');
@@ -301,12 +299,13 @@
 
             btnSubmit.disabled = true;
             btnSpinner.style.display = 'block';
-            btnText.innerText = 'Verifying...';
+            btnText.innerText = 'Verifying credentials...';
 
             try {
                 const response = await fetch('/api/auth/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
                     body: JSON.stringify({ email, password })
                 });
 
@@ -316,11 +315,7 @@
                     throw new Error(data.error || 'Authentication failed');
                 }
 
-                // Store token and user details in localStorage
-                localStorage.setItem('prithon_token', data.token);
-                localStorage.setItem('prithon_user', JSON.stringify(data.user));
-
-                btnText.innerText = 'Redirecting...';
+                btnText.innerText = 'Access Granted. Redirecting...';
                 window.location.replace('/dashboard');
             } catch (err) {
                 errorMsg.innerText = err.message || 'Login failed. Please check credentials.';
