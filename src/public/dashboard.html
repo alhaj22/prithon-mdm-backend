@@ -1288,6 +1288,12 @@
                     <span>Kiosk Security Rules</span>
                 </span>
             </a>
+            <a class="nav-item" href="javascript:void(0)" onclick="switchWorkspacePanel('panel-wallpaper', this)">
+                <span style="display:flex; align-items:center; gap:10px;">
+                    <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    <span>Wallpaper &amp; Branding</span>
+                </span>
+            </a>
             <a class="nav-item" href="javascript:void(0)" onclick="switchWorkspacePanel('panel-sms', this)">
                 <span style="display:flex; align-items:center; gap:10px;">
                     <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
@@ -1634,6 +1640,143 @@
                 </div>
             </section>
 
+            <!-- 8. REMOTE WALLPAPER & BRANDING STUDIO WORKSPACE -->
+            <section id="panel-wallpaper" class="workspace-panel">
+                <div class="card-panel-box" style="margin-bottom: 24px;">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
+                        <div>
+                            <div class="card-panel-title">Remote Wallpaper &amp; Corporate Branding Studio</div>
+                            <div class="card-panel-desc">
+                                Push customized store wallpapers, branding graphics, or finance warning notices directly to enrolled customer devices over-the-air.
+                            </div>
+                        </div>
+                        <span class="status-pill status-pill-online" style="font-size:11px; padding:4px 10px;">
+                            <span class="sync-dot" style="background:var(--success);"></span> Device Owner Enforced
+                        </span>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1.3fr 1fr; gap: 28px; margin-top: 24px;">
+                        <!-- Left: Controls & Upload -->
+                        <div>
+                            <!-- Target Device -->
+                            <div style="margin-bottom: 16px;">
+                                <label style="display:block; font-size:11px; font-weight:800; color:var(--text-secondary); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">Target Destination Handset</label>
+                                <select id="wp-target-device" class="scalefusion-input" style="width:100%; height:40px; cursor:pointer;">
+                                    <option value="all">🌐 Broadcast to All Fleet Devices</option>
+                                </select>
+                            </div>
+
+                            <!-- Target Screen -->
+                            <div style="margin-bottom: 18px;">
+                                <label style="display:block; font-size:11px; font-weight:800; color:var(--text-secondary); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">Apply To Screen</label>
+                                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                                    <button type="button" class="filter-pill active" id="btn-wp-screen-both" onclick="setWpTargetScreen('both', this)">📱 Both Home &amp; Lock</button>
+                                    <button type="button" class="filter-pill" id="btn-wp-screen-home" onclick="setWpTargetScreen('home', this)">🏠 Home Screen</button>
+                                    <button type="button" class="filter-pill" id="btn-wp-screen-lock" onclick="setWpTargetScreen('lock', this)">🔒 Lock Screen</button>
+                                </div>
+                            </div>
+
+                            <!-- Preset Themes -->
+                            <div style="margin-bottom: 18px;">
+                                <label style="display:block; font-size:11px; font-weight:800; color:var(--text-secondary); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">Curated Enterprise Presets</label>
+                                <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:10px;">
+                                    <div class="wp-preset-card active" onclick="selectPresetWallpaper(this, 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1200&auto=format&fit=crop')" style="cursor:pointer; border:2px solid var(--brand-accent); border-radius:8px; overflow:hidden; position:relative; aspect-ratio:9/16; background:#1e293b;">
+                                        <img src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=300&auto=format&fit=crop" style="width:100%; height:100%; object-fit:cover;" alt="Preset 1">
+                                        <div style="position:absolute; bottom:0; width:100%; font-size:9px; font-weight:700; background:rgba(0,0,0,0.7); color:#fff; text-align:center; padding:3px 0;">Obsidian</div>
+                                    </div>
+                                    <div class="wp-preset-card" onclick="selectPresetWallpaper(this, 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?q=80&w=1200&auto=format&fit=crop')" style="cursor:pointer; border:1px solid var(--border); border-radius:8px; overflow:hidden; position:relative; aspect-ratio:9/16; background:#1e293b;">
+                                        <img src="https://images.unsplash.com/photo-1579546929518-9e396f3cc809?q=80&w=300&auto=format&fit=crop" style="width:100%; height:100%; object-fit:cover;" alt="Preset 2">
+                                        <div style="position:absolute; bottom:0; width:100%; font-size:9px; font-weight:700; background:rgba(0,0,0,0.7); color:#fff; text-align:center; padding:3px 0;">Gradient</div>
+                                    </div>
+                                    <div class="wp-preset-card" onclick="selectPresetWallpaper(this, 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?q=80&w=1200&auto=format&fit=crop')" style="cursor:pointer; border:1px solid var(--border); border-radius:8px; overflow:hidden; position:relative; aspect-ratio:9/16; background:#1e293b;">
+                                        <img src="https://images.unsplash.com/photo-1550684848-fac1c5b4e853?q=80&w=300&auto=format&fit=crop" style="width:100%; height:100%; object-fit:cover;" alt="Preset 3">
+                                        <div style="position:absolute; bottom:0; width:100%; font-size:9px; font-weight:700; background:rgba(0,0,0,0.7); color:#fff; text-align:center; padding:3px 0;">Titanium</div>
+                                    </div>
+                                    <div class="wp-preset-card" onclick="selectPresetWallpaper(this, 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?q=80&w=1200&auto=format&fit=crop')" style="cursor:pointer; border:1px solid var(--border); border-radius:8px; overflow:hidden; position:relative; aspect-ratio:9/16; background:#1e293b;">
+                                        <img src="https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?q=80&w=300&auto=format&fit=crop" style="width:100%; height:100%; object-fit:cover;" alt="Preset 4">
+                                        <div style="position:absolute; bottom:0; width:100%; font-size:9px; font-weight:700; background:rgba(0,0,0,0.7); color:#fff; text-align:center; padding:3px 0;">Midnight</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Custom Upload -->
+                            <div style="margin-bottom: 16px;">
+                                <label style="display:block; font-size:11px; font-weight:800; color:var(--text-secondary); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">Upload Custom Image (PNG / JPG)</label>
+                                <div style="border:2px dashed var(--border); border-radius:10px; padding:18px; text-align:center; background:var(--bg-app); cursor:pointer; transition:border-color 0.2s;" onclick="document.getElementById('wp-file-input').click()">
+                                    <input type="file" id="wp-file-input" accept="image/*" style="display:none;" onchange="handleWallpaperFile(this)">
+                                    <svg viewBox="0 0 24 24" style="width:28px; height:28px; stroke:var(--text-muted); stroke-width:1.8; fill:none; margin:0 auto 6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                                    <div style="font-size:13px; font-weight:700; color:var(--text-main);" id="wp-file-label">Click or Drag &amp; Drop Image Here</div>
+                                    <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">PNG, JPG, WebP supported</div>
+                                </div>
+                            </div>
+
+                            <!-- Direct URL Input -->
+                            <div style="margin-bottom: 18px;">
+                                <label style="display:block; font-size:11px; font-weight:800; color:var(--text-secondary); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">Or Direct Image URL</label>
+                                <input type="text" id="wp-url-input" class="scalefusion-input" placeholder="https://example.com/branding-wallpaper.jpg" oninput="handleWallpaperUrl(this.value)">
+                            </div>
+
+                            <!-- Policy Lock Toggle -->
+                            <div style="margin-bottom: 22px; display:flex; align-items:center; gap:10px; padding:12px 14px; background:var(--bg-app); border:1px solid var(--border); border-radius:8px;">
+                                <input type="checkbox" id="wp-lock-changes" checked style="width:16px; height:16px; accent-color:var(--brand-blue); cursor:pointer;">
+                                <label for="wp-lock-changes" style="font-size:12px; font-weight:600; color:var(--text-main); cursor:pointer; user-select:none;">
+                                    Disallow user from changing wallpaper (Locked in Android Settings)
+                                </label>
+                            </div>
+
+                            <!-- Action Buttons -->
+                            <div style="display:flex; gap:12px;">
+                                <button class="btn-topbar btn-topbar-primary" style="flex:1; height:44px; font-size:13px; justify-content:center; background:var(--brand-blue); border-color:var(--brand-blue);" id="btn-push-wallpaper" onclick="pushRemoteWallpaper()">
+                                    <svg viewBox="0 0 24 24" style="width:16px; height:16px; stroke:currentColor; stroke-width:2; fill:none;"><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                                    <span>🚀 Push Wallpaper to Handset</span>
+                                </button>
+                                <button class="btn-topbar" style="height:44px; padding:0 16px; font-size:12px; color:var(--text-secondary);" onclick="clearRemoteWallpaper()">
+                                    <span>Reset to Default</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Right: Live Smartphone Mockup Preview -->
+                        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center;">
+                            <div style="font-size:11px; font-weight:800; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:12px;">Live Handset Preview</div>
+                            
+                            <!-- Phone Mockup Container -->
+                            <div style="width:230px; height:460px; background:#000; border-radius:38px; padding:8px; box-shadow:0 20px 40px rgba(0,0,0,0.25); border:4px solid #334155; position:relative; overflow:hidden;">
+                                <!-- Phone Notch / Camera -->
+                                <div style="width:60px; height:12px; background:#000; position:absolute; top:8px; left:50%; transform:translateX(-50%); border-radius:0 0 10px 10px; z-index:10;"></div>
+                                
+                                <!-- Wallpaper Screen Preview Area -->
+                                <div id="wp-preview-screen" style="width:100%; height:100%; border-radius:30px; background-size:cover; background-position:center; background-image:url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=600&auto=format&fit=crop'); position:relative; overflow:hidden; display:flex; flex-direction:column; justify-content:space-between; padding:24px 12px 14px;">
+                                    
+                                    <!-- Status Bar Time & Icons -->
+                                    <div style="display:flex; justify-content:space-between; align-items:center; color:#fff; font-size:10px; font-weight:700; text-shadow:0 1px 3px rgba(0,0,0,0.8);">
+                                        <span>12:30</span>
+                                        <div style="display:flex; gap:4px; font-size:9px;">
+                                            <span>5G</span>
+                                            <span>100%</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Clock Widget -->
+                                    <div style="text-align:center; color:#fff; text-shadow:0 2px 6px rgba(0,0,0,0.8); margin-top:10px;">
+                                        <div style="font-size:32px; font-weight:800; line-height:1;">12:30</div>
+                                        <div style="font-size:10px; font-weight:600; opacity:0.9; margin-top:2px;">Wednesday, Nov 26</div>
+                                    </div>
+
+                                    <!-- App Icons Dock Mockup -->
+                                    <div style="display:flex; justify-content:space-around; align-items:center; background:rgba(255,255,255,0.2); backdrop-filter:blur(8px); border-radius:14px; padding:6px 4px;">
+                                        <div style="width:28px; height:28px; background:#10B981; border-radius:7px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:11px;">📞</div>
+                                        <div style="width:28px; height:28px; background:#2563EB; border-radius:7px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:11px;">💬</div>
+                                        <div style="width:28px; height:28px; background:#0F172A; border-radius:7px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:11px; font-weight:800;">P</div>
+                                        <div style="width:28px; height:28px; background:#F59E0B; border-radius:7px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:11px;">⚙️</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
         </div>
     </main>
 
@@ -1846,6 +1989,7 @@
                 'panel-financing': 'EMI & Repayment Ledger',
                 'panel-provisioning': '6-Tap QR Provisioning Station',
                 'panel-policies': 'Hardware Kiosk Security Rules',
+                'panel-wallpaper': 'Remote Wallpaper Studio & Fleet Branding',
                 'panel-sms': '0-KB Silent SMS Hub',
                 'panel-webhooks': 'Payment Settlement Dispatch'
             };
@@ -1941,6 +2085,7 @@
         // Core Render Function: Scalefusion Table & Cards
         function renderDeviceList(devices) {
             registeredDevices = devices || {};
+            populateWallpaperDeviceDropdown(registeredDevices);
             const tbody = document.getElementById('scalefusion-table-body');
             const gridWrapper = document.getElementById('fleet-grid-wrapper');
             const mapListWrapper = document.getElementById('live-map-fleet-list');
@@ -2461,6 +2606,156 @@
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#039;');
+        }
+
+        let currentWpScreen = 'both';
+        let currentWpSource = { type: 'preset', value: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1200&auto=format&fit=crop' };
+
+        function setWpTargetScreen(screen, el) {
+            currentWpScreen = screen;
+            document.querySelectorAll('#panel-wallpaper .filter-pill').forEach(p => p.classList.remove('active'));
+            if (el) el.classList.add('active');
+        }
+
+        function selectPresetWallpaper(el, url) {
+            document.querySelectorAll('.wp-preset-card').forEach(c => {
+                c.style.border = '1px solid var(--border)';
+                c.classList.remove('active');
+            });
+            el.style.border = '2px solid var(--brand-accent)';
+            el.classList.add('active');
+            currentWpSource = { type: 'url', value: url };
+            const urlInput = document.getElementById('wp-url-input');
+            if (urlInput) urlInput.value = '';
+            const fileLabel = document.getElementById('wp-file-label');
+            if (fileLabel) fileLabel.innerText = 'Click or Drag & Drop Image Here';
+            updateWallpaperPreview(url);
+        }
+
+        function handleWallpaperFile(input) {
+            if (!input.files || !input.files[0]) return;
+            const file = input.files[0];
+            document.getElementById('wp-file-label').innerText = file.name;
+            document.querySelectorAll('.wp-preset-card').forEach(c => {
+                c.style.border = '1px solid var(--border)';
+                c.classList.remove('active');
+            });
+            const urlInput = document.getElementById('wp-url-input');
+            if (urlInput) urlInput.value = '';
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const base64 = e.target.result;
+                currentWpSource = { type: 'base64', value: base64 };
+                updateWallpaperPreview(base64);
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function handleWallpaperUrl(url) {
+            if (!url) return;
+            document.querySelectorAll('.wp-preset-card').forEach(c => {
+                c.style.border = '1px solid var(--border)';
+                c.classList.remove('active');
+            });
+            const fileLabel = document.getElementById('wp-file-label');
+            if (fileLabel) fileLabel.innerText = 'Click or Drag & Drop Image Here';
+            currentWpSource = { type: 'url', value: url };
+            updateWallpaperPreview(url);
+        }
+
+        function updateWallpaperPreview(imgSrc) {
+            const screen = document.getElementById('wp-preview-screen');
+            if (screen) {
+                screen.style.backgroundImage = `url('${imgSrc}')`;
+            }
+        }
+
+        function populateWallpaperDeviceDropdown(devices) {
+            const select = document.getElementById('wp-target-device');
+            if (!select) return;
+            const currentVal = select.value;
+            select.innerHTML = '<option value="all">🌐 Broadcast to All Fleet Devices</option>';
+            Object.values(devices || {}).forEach(dev => {
+                const opt = document.createElement('option');
+                opt.value = dev.id;
+                const statusEmoji = dev.isOnline ? '🟢' : '⚪';
+                opt.innerText = `${statusEmoji} ${dev.model || 'Device'} (${dev.customerName || dev.id}) - ${dev.hardwareImei || dev.enteredImei || ''}`;
+                select.appendChild(opt);
+            });
+            if (currentVal && Array.from(select.options).some(o => o.value === currentVal)) {
+                select.value = currentVal;
+            }
+        }
+
+        async function pushRemoteWallpaper() {
+            const btn = document.getElementById('btn-push-wallpaper');
+            const targetDevice = document.getElementById('wp-target-device').value;
+            const lockChanges = document.getElementById('wp-lock-changes').checked;
+
+            if (!currentWpSource.value) {
+                alert('Please select a preset, upload an image, or enter an image URL.');
+                return;
+            }
+
+            const origContent = btn.innerHTML;
+            btn.innerHTML = '<span>⏳ Pushing to Handset...</span>';
+            btn.disabled = true;
+
+            try {
+                const payload = {
+                    deviceId: targetDevice,
+                    targetScreen: currentWpScreen,
+                    lockChanges: lockChanges
+                };
+
+                if (currentWpSource.type === 'base64') {
+                    payload.imageBase64 = currentWpSource.value;
+                } else {
+                    payload.imageUrl = currentWpSource.value;
+                }
+
+                const res = await fetch('/api/devices/wallpaper', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await res.json();
+                if (data.success) {
+                    alert(`✅ ${data.message}`);
+                } else {
+                    alert(`❌ Failed: ${data.error || 'Server error'}`);
+                }
+            } catch (err) {
+                alert(`❌ Network Error: ${err.message}`);
+            } finally {
+                btn.innerHTML = origContent;
+                btn.disabled = false;
+            }
+        }
+
+        async function clearRemoteWallpaper() {
+            if (!confirm('Are you sure you want to restore the factory default wallpaper on selected device(s)?')) return;
+            const targetDevice = document.getElementById('wp-target-device').value;
+
+            try {
+                const res = await fetch('/api/devices/wallpaper/clear', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({ deviceId: targetDevice })
+                });
+                const data = await res.json();
+                alert(data.message || 'Default wallpaper restored.');
+            } catch (err) {
+                alert(`Error: ${err.message}`);
+            }
         }
 
         // Initialize tenant UI and QR on start

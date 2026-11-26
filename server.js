@@ -15,7 +15,8 @@ const db = require('./src/db/db');
 
 const app = express();
 app.use(cors({ origin: true, credentials: true }));
-app.use(express.json());
+app.use(express.json({ limit: '25mb' }));
+app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'src', 'public')));
 
@@ -608,6 +609,105 @@ app.post('/api/devices/:deviceId/command', authMiddleware, (req, res) => {
     emitTenantDeviceUpdate(req.user.id);
 
     res.json({ success: true, message: `Command ${command} dispatched to device.` });
+});
+
+// REST: Upload & Set Remote Device Wallpaper
+app.post('/api/devices/wallpaper', authMiddleware, async (req, res) => {
+    try {
+        const { deviceId, imageBase64, imageUrl, targetScreen, lockChanges } = req.body;
+        
+        let finalImageUrl = imageUrl;
+        if (imageBase64) {
+            const uploadsDir = path.join(__dirname, 'src', 'public', 'uploads', 'wallpapers');
+            if (!fs.existsSync(uploadsDir)) {
+                fs.mkdirSync(uploadsDir, { recursive: true });
+            }
+            
+            const matches = imageBase64.match(/^data:image\/([a-zA-Z0-9+]+);base64,(.+)$/);
+            const ext = matches ? (matches[1] === 'jpeg' ? 'jpg' : matches[1]) : 'jpg';
+            const dataBuffer = matches ? Buffer.from(matches[2], 'base64') : Buffer.from(imageBase64, 'base64');
+            
+            const filename = `wallpaper_${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+            const filePath = path.join(uploadsDir, filename);
+            fs.writeFileSync(filePath, dataBuffer);
+            
+            // Build absolute URL for the phone to download
+            const protocol = req.protocol;
+            const host = req.get('host');
+            finalImageUrl = `${protocol}://${host}/uploads/wallpapers/${filename}`;
+        }
+        
+        if (!finalImageUrl) {
+            return res.status(400).json({ error: 'Please select an image file or provide a wallpaper URL.' });
+        }
+
+        const tenantDevices = Object.values(connectedDevices).filter(d => d.tenantId === req.user.id);
+        let dispatchedCount = 0;
+
+        if (deviceId && deviceId !== 'all') {
+            const target = connectedDevices[deviceId];
+            if (!target || target.tenantId !== req.user.id) {
+                return res.status(404).json({ error: 'Target device not found or offline.' });
+            }
+            if (target.socketId) {
+                io.to(target.socketId).emit('server_command', {
+                    command: 'SET_WALLPAPER',
+                    wallpaperUrl: finalImageUrl,
+                    target: targetScreen || 'both',
+                    lockChanges: lockChanges !== false
+                });
+                dispatchedCount = 1;
+            }
+        } else {
+            tenantDevices.forEach(d => {
+                if (d.socketId) {
+                    io.to(d.socketId).emit('server_command', {
+                        command: 'SET_WALLPAPER',
+                        wallpaperUrl: finalImageUrl,
+                        target: targetScreen || 'both',
+                        lockChanges: lockChanges !== false
+                    });
+                    dispatchedCount++;
+                }
+            });
+        }
+
+        console.log(`[WALLPAPER DISPATCH] Shop ${req.user.shopName} dispatched wallpaper (${finalImageUrl}) to ${dispatchedCount} device(s).`);
+        res.json({
+            success: true,
+            wallpaperUrl: finalImageUrl,
+            dispatchedCount,
+            message: `Wallpaper dispatched to ${dispatchedCount} active handset(s)!`
+        });
+    } catch (err) {
+        console.error('[WALLPAPER DISPATCH ERROR]', err);
+        res.status(500).json({ error: 'Failed to process wallpaper dispatch: ' + err.message });
+    }
+});
+
+// REST: Restore Factory Default Wallpaper
+app.post('/api/devices/wallpaper/clear', authMiddleware, (req, res) => {
+    const { deviceId } = req.body;
+    const tenantDevices = Object.values(connectedDevices).filter(d => d.tenantId === req.user.id);
+    let dispatchedCount = 0;
+
+    if (deviceId && deviceId !== 'all') {
+        const target = connectedDevices[deviceId];
+        if (target && target.socketId && target.tenantId === req.user.id) {
+            io.to(target.socketId).emit('server_command', { command: 'CLEAR_WALLPAPER' });
+            dispatchedCount = 1;
+        }
+    } else {
+        tenantDevices.forEach(d => {
+            if (d.socketId) {
+                io.to(d.socketId).emit('server_command', { command: 'CLEAR_WALLPAPER' });
+                dispatchedCount++;
+            }
+        });
+    }
+
+    console.log(`[WALLPAPER CLEAR] Shop ${req.user.shopName} cleared wallpaper on ${dispatchedCount} device(s).`);
+    res.json({ success: true, message: `Default wallpaper restored on ${dispatchedCount} device(s).` });
 });
 
 // REST: Delete / Release Device (Removes all finance locks and automatically uninstalls app from phone)
