@@ -4,13 +4,13 @@ const { findTenantById } = require('../models/tenantStore');
 const JWT_SECRET = process.env.JWT_SECRET || 'prithon_enterprise_mdm_secret_key_2026';
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || (JWT_SECRET + '_refresh_2026');
 
-// Cookie security configurations
+// Cookie security configurations (Set to 1 min Access Token & 2 min Refresh Token for testing)
 const COOKIE_OPTIONS_ACCESS = {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
-    maxAge: 15 * 60 * 1000 // 15 minutes short-lived access token
+    maxAge: 1 * 60 * 1000 // 1 minute (60 seconds)
 };
 
 const COOKIE_OPTIONS_REFRESH = {
@@ -18,7 +18,7 @@ const COOKIE_OPTIONS_REFRESH = {
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
-    maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days long-lived refresh token
+    maxAge: 2 * 60 * 1000 // 2 minutes (120 seconds)
 };
 
 function generateAccessToken(tenant) {
@@ -43,7 +43,7 @@ function generateAccessToken(tenant) {
             tokenType: 'access'
         },
         JWT_SECRET,
-        { expiresIn: '15m' }
+        { expiresIn: '1m' } // 1 minute
     );
 }
 
@@ -58,7 +58,7 @@ function generateRefreshToken(tenant) {
             tokenType: 'refresh'
         },
         JWT_REFRESH_SECRET,
-        { expiresIn: '30d' }
+        { expiresIn: '2m' } // 2 minutes
     );
 }
 
@@ -129,6 +129,8 @@ async function authMiddleware(req, res, next) {
                 req.user = tenant;
                 return next();
             }
+        } else {
+            console.log('[AUTH DEBUG] Access Token expired (1m lifetime reached). Checking Refresh Token...');
         }
     }
 
@@ -141,12 +143,15 @@ async function authMiddleware(req, res, next) {
             const tenant = await findTenantById(targetId);
             if (tenant) {
                 // Transparent silent refresh: issue new access token cookie
+                console.log(`[AUTH DEBUG] Refresh Token valid (within 2m). Silently refreshed Access Token for: ${tenant.companyName || tenant.email}`);
                 const newAccessToken = generateAccessToken(tenant);
                 res.cookie('accessToken', newAccessToken, COOKIE_OPTIONS_ACCESS);
                 res.cookie('prithon_token', newAccessToken, COOKIE_OPTIONS_ACCESS);
                 req.user = tenant;
                 return next();
             }
+        } else {
+            console.log('[AUTH DEBUG] Refresh Token expired (2m lifetime reached). Session completely ended.');
         }
     }
 
