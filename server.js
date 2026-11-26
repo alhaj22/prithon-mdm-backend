@@ -270,13 +270,123 @@ async function logAudit({ companyId, tenantId, deviceId, eventType, req, payload
 }
 
 // ==========================================
+// PEARL SMS OTP VERIFICATION ENGINE
+// ==========================================
+const PEARLSMS_API_KEY = process.env.PEARLSMS_API_KEY || 'b3e9a5bb160c4299a0950e803c724916';
+const PEARLSMS_API_URL = process.env.PEARLSMS_API_URL || 'http://sms.pearlsms.com/public/sms/send';
+const PEARLSMS_SENDER_ID = process.env.PEARLSMS_SENDER_ID || 'SPPLFW';
+const PEARLSMS_SMS_TYPE = process.env.PEARLSMS_SMS_TYPE || 'TRANS';
+
+// In-memory OTP storage: cleanPhone -> { otp, expiresAt, verified, lastSent }
+const otpStore = new Map();
+
+function sanitizePhoneNumber(phone) {
+    if (!phone) return null;
+    let clean = String(phone).replace(/\D/g, '');
+    if (clean.length === 12 && clean.startsWith('91')) {
+        clean = clean.substring(2);
+    } else if (clean.length === 11 && clean.startsWith('0')) {
+        clean = clean.substring(1);
+    }
+    return clean.length === 10 ? clean : null;
+}
+
+async function sendPearlSms(phone, otp) {
+    const message = `Your OTP is ${otp}. Use this to verify your mobile number on SPPLFW. Valid for 5 minutes.`;
+    const params = new URLSearchParams({
+        sender: PEARLSMS_SENDER_ID,
+        numbers: phone,
+        message: message,
+        apikey: PEARLSMS_API_KEY,
+        smstype: PEARLSMS_SMS_TYPE
+    });
+
+    const url = `${PEARLSMS_API_URL}?${params.toString()}`;
+    const response = await fetch(url, { method: 'GET' });
+    const json = await response.json().catch(() => null);
+
+    if (!response.ok || (json && json.status === 'ERROR')) {
+        throw new Error(json?.errormsg || json?.detail || 'SMS delivery failed');
+    }
+    return json;
+}
+
+// 0. Send OTP API
+app.post('/api/auth/send-otp', async (req, res) => {
+    try {
+        const { phone } = req.body;
+        const cleanPhone = sanitizePhoneNumber(phone);
+        if (!cleanPhone) {
+            return res.status(400).json({ error: 'Please enter a valid 10-digit mobile number.' });
+        }
+
+        const existing = otpStore.get(cleanPhone);
+        if (existing && Date.now() - existing.lastSent < 30000) {
+            const waitSec = Math.ceil((30000 - (Date.now() - existing.lastSent)) / 1000);
+            return res.status(429).json({ error: `Please wait ${waitSec} seconds before requesting a new OTP.` });
+        }
+
+        // Generate 6-digit numeric OTP
+        const otp = String(Math.floor(100000 + Math.random() * 900000));
+        const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes validity
+
+        await sendPearlSms(cleanPhone, otp);
+
+        otpStore.set(cleanPhone, {
+            otp,
+            expiresAt,
+            verified: false,
+            lastSent: Date.now()
+        });
+
+        console.log(`[PEARL SMS] OTP ${otp} dispatched successfully to ${cleanPhone}`);
+        return res.json({
+            success: true,
+            message: 'OTP sent successfully to your mobile number. Valid for 5 minutes.'
+        });
+    } catch (err) {
+        console.error('[PEARL SMS ERROR]', err);
+        return res.status(500).json({ error: `Failed to send SMS: ${err.message || 'SMS Gateway error'}` });
+    }
+});
+
+// 0.1 Verify OTP API
+app.post('/api/auth/verify-otp', async (req, res) => {
+    try {
+        const { phone, otp } = req.body;
+        const cleanPhone = sanitizePhoneNumber(phone);
+        if (!cleanPhone) {
+            return res.status(400).json({ error: 'Please provide a valid 10-digit mobile number.' });
+        }
+        const cleanOtp = String(otp || '').trim();
+        if (cleanOtp.length !== 6) {
+            return res.status(400).json({ error: 'Please enter a valid 6-digit OTP.' });
+        }
+
+        const record = otpStore.get(cleanPhone);
+        if (!record || Date.now() > record.expiresAt) {
+            return res.status(400).json({ error: 'OTP has expired or was not requested. Please request a new OTP.' });
+        }
+
+        if (record.otp !== cleanOtp) {
+            return res.status(400).json({ error: 'Incorrect OTP. Please check the code sent to your mobile.' });
+        }
+
+        record.verified = true;
+        return res.json({ success: true, message: 'Mobile number verified successfully!' });
+    } catch (err) {
+        return res.status(500).json({ error: err.message || 'Verification failed.' });
+    }
+});
+
+// ==========================================
 // AUTHENTICATION API ROUTES
 // ==========================================
 
 // 1. Retailer Signup
 app.post('/api/auth/signup', async (req, res) => {
     try {
-        const { userName, ownerName, email, password, confirmPassword, phone, company, shopName, city, address } = req.body;
+        const { userName, ownerName, email, password, confirmPassword, phone, otp, company, shopName, city, address } = req.body;
         const resolvedUserName = (userName || ownerName || '').trim();
         const resolvedCompany = (company || shopName || '').trim();
         const resolvedEmail = (email || '').trim().toLowerCase();
@@ -297,12 +407,35 @@ app.post('/api/auth/signup', async (req, res) => {
             return res.status(400).json({ error: 'Company name is required.' });
         }
 
+        // Strict Phone & OTP Verification
+        const cleanPhone = sanitizePhoneNumber(phone);
+        if (!cleanPhone) {
+            return res.status(400).json({ error: 'A valid 10-digit mobile number is required.' });
+        }
+
+        const cleanOtp = String(otp || '').trim();
+        if (!cleanOtp || cleanOtp.length !== 6) {
+            return res.status(400).json({ error: 'Please enter the 6-digit OTP sent to your mobile.' });
+        }
+
+        const otpRecord = otpStore.get(cleanPhone);
+        if (!otpRecord || Date.now() > otpRecord.expiresAt) {
+            return res.status(400).json({ error: 'OTP has expired or was not requested. Click "Send OTP" to receive a new code.' });
+        }
+
+        if (otpRecord.otp !== cleanOtp) {
+            return res.status(400).json({ error: 'Invalid OTP. Please enter the correct 6-digit code received via SMS.' });
+        }
+
+        // OTP verified successfully! Delete OTP from cache to avoid reuse
+        otpStore.delete(cleanPhone);
+
         const tenant = await createTenant({
             userName: resolvedUserName,
             ownerName: resolvedUserName,
             email: resolvedEmail,
             password,
-            phone: (phone || '').trim(),
+            phone: cleanPhone,
             company: resolvedCompany,
             shopName: resolvedCompany,
             city: (city || '').trim(),

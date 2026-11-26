@@ -202,6 +202,50 @@
             gap: 8px;
         }
 
+        .success-banner {
+            display: none;
+            background: rgba(16, 185, 129, 0.12);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: #6EE7B7;
+            padding: 12px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-bottom: 18px;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-otp {
+            background: linear-gradient(135deg, #00E5FF 0%, #00B4D8 100%);
+            color: #060911;
+            border: none;
+            border-radius: 10px;
+            height: 44px;
+            padding: 0 18px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-otp:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(0, 229, 255, 0.3);
+        }
+
+        .btn-otp:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+            background: #1e293b;
+            color: #94a3b8;
+            transform: none;
+            box-shadow: none;
+        }
+
         .auth-footer {
             margin-top: 24px;
             text-align: center;
@@ -254,7 +298,13 @@
         </div>
 
         <div id="errorBanner" class="error-banner">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
             <span id="errorMsg">Registration failed</span>
+        </div>
+
+        <div id="successBanner" class="success-banner">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            <span id="successMsg">OTP sent successfully</span>
         </div>
 
         <form id="signupForm">
@@ -277,8 +327,8 @@
                     <input class="form-input" type="email" id="email" required placeholder="e.g. admin@prithon.com" autocomplete="email">
                 </div>
                 <div class="form-group">
-                    <label class="form-label" for="phone">Phone No *</label>
-                    <input class="form-input" type="tel" id="phone" required placeholder="e.g. 9876543210" autocomplete="tel">
+                    <label class="form-label" for="phone">Phone No * (10 Digits)</label>
+                    <input class="form-input" type="tel" id="phone" required placeholder="e.g. 9876543210" maxlength="10" autocomplete="tel">
                 </div>
             </div>
 
@@ -294,7 +344,31 @@
                 </div>
             </div>
 
-            <!-- Row 4: City & Address -->
+            <!-- Row 4: 6-Digit OTP Field with Send OTP Button -->
+            <div class="form-group" style="background: rgba(0, 229, 255, 0.03); border: 1px dashed rgba(0, 229, 255, 0.2); border-radius: 12px; padding: 14px 16px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
+                    <label class="form-label" for="otp" style="margin-bottom:0; color:var(--text-main); font-weight:600;">
+                        SMS Verification Code (6-Digit OTP) *
+                    </label>
+                    <span id="otpBadge" style="display:none; font-size:11px; font-weight:700; color:var(--emerald); background:rgba(16, 185, 129, 0.15); padding:2px 8px; border-radius:10px;">
+                        ✓ OTP SENT
+                    </span>
+                </div>
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <div style="position:relative; flex:1;">
+                        <input class="form-input" type="text" id="otp" required placeholder="Enter 6-digit OTP" maxlength="6" inputmode="numeric" style="letter-spacing: 5px; font-weight: 700; font-family: 'JetBrains Mono', monospace; font-size: 16px; text-align: center; background: var(--bg-surface);">
+                    </div>
+                    <button type="button" id="btnSendOtp" class="btn-otp">
+                        <div id="otpSpinner" class="spinner" style="width:14px; height:14px; border-width:2px;"></div>
+                        <span id="otpBtnText">Send OTP</span>
+                    </button>
+                </div>
+                <div style="font-size: 11.5px; color: var(--text-dim); margin-top: 6px;">
+                    OTP will be sent via Pearl SMS to your entered 10-digit Phone No. Valid for 5 minutes.
+                </div>
+            </div>
+
+            <!-- Row 5: City & Address -->
             <div class="form-row">
                 <div class="form-group">
                     <label class="form-label" for="city">City *</label>
@@ -308,7 +382,7 @@
 
             <button type="submit" id="btnSubmit" class="btn-submit">
                 <div id="btnSpinner" class="spinner"></div>
-                <span id="btnText">Register Admin &amp; Access Dashboard</span>
+                <span id="btnText">Verify OTP &amp; Create Admin Account</span>
             </button>
         </form>
 
@@ -322,44 +396,139 @@
         const signupForm = document.getElementById('signupForm');
         const errorBanner = document.getElementById('errorBanner');
         const errorMsg = document.getElementById('errorMsg');
+        const successBanner = document.getElementById('successBanner');
+        const successMsg = document.getElementById('successMsg');
         const btnSubmit = document.getElementById('btnSubmit');
         const btnSpinner = document.getElementById('btnSpinner');
         const btnText = document.getElementById('btnText');
 
+        const phoneInput = document.getElementById('phone');
+        const otpInput = document.getElementById('otp');
+        const btnSendOtp = document.getElementById('btnSendOtp');
+        const otpSpinner = document.getElementById('otpSpinner');
+        const otpBtnText = document.getElementById('otpBtnText');
+        const otpBadge = document.getElementById('otpBadge');
+
+        let otpCountdownTimer = null;
+
+        function showError(msg) {
+            successBanner.style.display = 'none';
+            errorMsg.innerText = msg;
+            errorBanner.style.display = 'flex';
+        }
+
+        function showSuccess(msg) {
+            errorBanner.style.display = 'none';
+            successMsg.innerText = msg;
+            successBanner.style.display = 'flex';
+        }
+
+        function clearAlerts() {
+            errorBanner.style.display = 'none';
+            successBanner.style.display = 'none';
+        }
+
+        // Send OTP Handler
+        btnSendOtp.addEventListener('click', async () => {
+            clearAlerts();
+            const phone = phoneInput.value.trim().replace(/\D/g, '');
+
+            if (!phone || phone.length !== 10) {
+                showError('Please enter a valid 10-digit mobile number before requesting OTP.');
+                phoneInput.focus();
+                return;
+            }
+
+            btnSendOtp.disabled = true;
+            otpSpinner.style.display = 'block';
+            otpBtnText.innerText = 'Sending...';
+
+            try {
+                const response = await fetch('/api/auth/send-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone })
+                });
+
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to send OTP.');
+                }
+
+                showSuccess(data.message || 'OTP sent successfully! Please check your SMS inbox.');
+                otpBadge.style.display = 'inline-block';
+                otpInput.focus();
+
+                // Start 45s countdown timer
+                let countdown = 45;
+                otpSpinner.style.display = 'none';
+                otpBtnText.innerText = `Resend (${countdown}s)`;
+
+                clearInterval(otpCountdownTimer);
+                otpCountdownTimer = setInterval(() => {
+                    countdown--;
+                    if (countdown <= 0) {
+                        clearInterval(otpCountdownTimer);
+                        btnSendOtp.disabled = false;
+                        otpBtnText.innerText = 'Resend OTP';
+                    } else {
+                        otpBtnText.innerText = `Resend (${countdown}s)`;
+                    }
+                }, 1000);
+
+            } catch (err) {
+                showError(err.message || 'Failed to dispatch OTP via Pearl SMS.');
+                btnSendOtp.disabled = false;
+                otpSpinner.style.display = 'none';
+                otpBtnText.innerText = 'Send OTP';
+            }
+        });
+
+        // Registration Submit Handler
         signupForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            errorBanner.style.display = 'none';
+            clearAlerts();
 
             const userName = document.getElementById('userName').value.trim();
             const company = document.getElementById('company').value.trim();
             const email = document.getElementById('email').value.trim();
-            const phone = document.getElementById('phone').value.trim();
+            const phone = phoneInput.value.trim().replace(/\D/g, '');
+            const otp = otpInput.value.trim();
             const password = document.getElementById('password').value;
             const confirmPassword = document.getElementById('confirmPassword').value;
             const city = document.getElementById('city').value.trim();
             const address = document.getElementById('address').value.trim();
 
             if (!userName || !company || !email || !phone || !city || !address) {
-                errorMsg.innerText = 'Please fill out all required fields.';
-                errorBanner.style.display = 'flex';
+                showError('Please fill out all required fields.');
+                return;
+            }
+
+            if (phone.length !== 10) {
+                showError('Please provide a valid 10-digit mobile number.');
+                phoneInput.focus();
                 return;
             }
 
             if (password.length < 6) {
-                errorMsg.innerText = 'Password must be at least 6 characters.';
-                errorBanner.style.display = 'flex';
+                showError('Password must be at least 6 characters.');
                 return;
             }
 
             if (password !== confirmPassword) {
-                errorMsg.innerText = 'Password and Confirm Password do not match.';
-                errorBanner.style.display = 'flex';
+                showError('Password and Confirm Password do not match.');
+                return;
+            }
+
+            if (!otp || otp.length !== 6) {
+                showError('Please enter the 6-digit OTP sent to your phone and click Verify.');
+                otpInput.focus();
                 return;
             }
 
             btnSubmit.disabled = true;
             btnSpinner.style.display = 'block';
-            btnText.innerText = 'Creating Admin Workspace...';
+            btnText.innerText = 'Verifying OTP & Creating Admin...';
 
             try {
                 const response = await fetch('/api/auth/signup', {
@@ -370,6 +539,7 @@
                         company,
                         email,
                         phone,
+                        otp,
                         password,
                         confirmPassword,
                         city,
@@ -387,14 +557,16 @@
                 localStorage.setItem('prithon_token', data.token);
                 localStorage.setItem('prithon_user', JSON.stringify(data.user));
 
+                showSuccess('Registration verified! Redirecting to dashboard...');
                 btnText.innerText = 'Redirecting to Dashboard...';
-                window.location.replace('/dashboard');
+                setTimeout(() => {
+                    window.location.replace('/dashboard');
+                }, 800);
             } catch (err) {
-                errorMsg.innerText = err.message || 'Signup failed. Please try again.';
-                errorBanner.style.display = 'flex';
+                showError(err.message || 'Signup failed. Please verify your OTP and try again.');
                 btnSubmit.disabled = false;
                 btnSpinner.style.display = 'none';
-                btnText.innerText = 'Register Admin & Access Dashboard';
+                btnText.innerText = 'Verify OTP & Create Admin Account';
             }
         });
     </script>
