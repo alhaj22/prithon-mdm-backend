@@ -100,17 +100,19 @@ async function persistDeviceToPostgres(dev) {
     try {
         const queryText = `
             INSERT INTO devices (
-                device_id, tenant_id, tenant_code, brand, model, battery, android_version,
+                device_id, tenant_id, tenant_code, company_id, company_code, brand, model, battery, android_version,
                 status, online, ip, last_seen, is_device_owner, customer_name, customer_phone,
                 loan_id, emi_amount, due_date, entered_imei, hardware_imei, imei_verified, imei_status, apps,
                 latitude, longitude, location_accuracy, location_updated_at, location_address, updated_at
             ) VALUES (
                 $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22,
-                $23, $24, $25, $26, $27, NOW()
+                $23, $24, $25, $26, $27, $28, $29, NOW()
             )
             ON CONFLICT (device_id) DO UPDATE SET
                 tenant_id = EXCLUDED.tenant_id,
                 tenant_code = EXCLUDED.tenant_code,
+                company_id = EXCLUDED.company_id,
+                company_code = EXCLUDED.company_code,
                 brand = EXCLUDED.brand,
                 model = EXCLUDED.model,
                 battery = EXCLUDED.battery,
@@ -137,7 +139,7 @@ async function persistDeviceToPostgres(dev) {
                 location_address = COALESCE(EXCLUDED.location_address, devices.location_address),
                 updated_at = NOW();
         `;
-        let validTenantId = dev.tenantId || null;
+        let validTenantId = dev.companyId || dev.tenantId || null;
         if (validTenantId) {
             try {
                 const tCheck = await db.query('SELECT id FROM tenants WHERE id = $1', [validTenantId]);
@@ -148,11 +150,14 @@ async function persistDeviceToPostgres(dev) {
                 validTenantId = null;
             }
         }
+        const validCode = dev.companyCode || dev.tenantCode || null;
 
         await db.query(queryText, [
             dev.deviceId,
             validTenantId,
-            dev.tenantCode || null,
+            validCode,
+            validTenantId,
+            validCode,
             dev.brand || 'Android',
             dev.model || 'Device',
             dev.battery || 100,
@@ -225,23 +230,43 @@ function getApkSignatureChecksum() {
         .replace(/\//g, '_');
 }
 
-// Helper: Get fleet devices filtered strictly by tenantId
+// Helper: Get fleet devices filtered strictly by companyId / tenantId
 function getTenantDevices(tenantId) {
     const filtered = {};
     for (const id in connectedDevices) {
         const d = connectedDevices[id];
-        if (d.tenantId === tenantId || (tenantId === 'tenant_1fa9abb03962dff6' && (!d.tenantId || d.tenantCode === 'ALH-9565'))) {
+        const devCompanyId = d.companyId || d.tenantId;
+        const devCompanyCode = d.companyCode || d.tenantCode;
+        if (devCompanyId === tenantId || (tenantId === 'tenant_1fa9abb03962dff6' && (!devCompanyId || devCompanyCode === 'ALH-9565'))) {
             filtered[id] = d;
         }
     }
     return filtered;
 }
 
-// Helper: Broadcast device updates exclusively to a specific tenant room
+// Helper: Broadcast device updates exclusively to a specific company room
 function emitTenantDeviceUpdate(tenantId) {
     if (!tenantId) return;
     const tenantDevices = getTenantDevices(tenantId);
     io.to(`tenant_${tenantId}`).emit('device_list_updated', tenantDevices);
+}
+
+// Enterprise Security & Compliance Audit Logger
+async function logAudit({ companyId, tenantId, deviceId, eventType, req, payload = {} }) {
+    const resolvedCompanyId = companyId || tenantId || (req?.user ? (req.user.companyId || req.user.id || req.user.tenantId) : null);
+    const ip = req ? (req.headers['x-forwarded-for'] || req.ip || req.connection?.remoteAddress || '127.0.0.1') : 'SYSTEM';
+
+    if (db.isPostgresConnected() && resolvedCompanyId) {
+        try {
+            await db.query(
+                `INSERT INTO audit_logs (tenant_id, company_id, device_id, event_type, ip_address, payload, created_at)
+                 VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+                [resolvedCompanyId, resolvedCompanyId, deviceId || null, eventType, ip, JSON.stringify(payload)]
+            );
+        } catch (e) {
+            console.warn('[AUDIT LOG ERROR]', e.message);
+        }
+    }
 }
 
 // ==========================================
@@ -285,6 +310,13 @@ app.post('/api/auth/signup', async (req, res) => {
         });
         const token = generateToken(tenant);
 
+        await logAudit({
+            companyId: tenant.id,
+            eventType: 'COMPANY_ACCOUNT_REGISTERED',
+            req,
+            payload: { company: tenant.companyName, email: tenant.email, userName: tenant.userName }
+        });
+
         res.cookie('prithon_token', token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
@@ -294,7 +326,7 @@ app.post('/api/auth/signup', async (req, res) => {
 
         res.status(201).json({
             success: true,
-            message: 'Shop account created successfully.',
+            message: 'Company account created successfully.',
             token,
             user: tenant
         });
@@ -314,6 +346,13 @@ app.post('/api/auth/login', async (req, res) => {
 
         const tenant = await authenticateTenant(email, password);
         const token = generateToken(tenant);
+
+        await logAudit({
+            companyId: tenant.id,
+            eventType: 'ADMIN_LOGIN_SUCCESS',
+            req,
+            payload: { email: tenant.email, company: tenant.companyName, userName: tenant.userName }
+        });
 
         res.cookie('prithon_token', token, {
             httpOnly: true,
@@ -340,8 +379,50 @@ app.get('/api/auth/me', authMiddleware, (req, res) => {
 
 // 4. Logout
 app.post('/api/auth/logout', (req, res) => {
+    let user = null;
+    try {
+        const token = req.cookies?.prithon_token || req.headers?.authorization?.replace('Bearer ', '');
+        if (token) user = jwt.verify(token, JWT_SECRET);
+    } catch (e) {}
+    if (user) {
+        logAudit({ companyId: user.companyId || user.id, eventType: 'ADMIN_LOGOUT', req, payload: { email: user.email } });
+    }
     res.clearCookie('prithon_token');
     res.json({ success: true, message: 'Logged out successfully.' });
+});
+
+// 5. Enterprise Security & Activity Audit Trail
+app.get('/api/audit-logs', authMiddleware, async (req, res) => {
+    const companyId = req.user.companyId || req.user.id || req.user.tenantId;
+    const limit = Math.min(parseInt(req.query.limit) || 100, 500);
+    const deviceId = req.query.deviceId || null;
+
+    if (!db.isPostgresConnected()) {
+        return res.json({ success: true, count: 0, logs: [] });
+    }
+
+    try {
+        let queryText = `
+            SELECT id, tenant_id as "companyId", company_id as "companyId", device_id as "deviceId",
+                   event_type as "eventType", ip_address as "ipAddress", payload, created_at as "createdAt"
+            FROM audit_logs
+            WHERE (tenant_id = $1 OR company_id = $1)
+        `;
+        const params = [companyId];
+
+        if (deviceId) {
+            params.push(deviceId);
+            queryText += ` AND device_id = $2`;
+        }
+
+        queryText += ` ORDER BY created_at DESC LIMIT $${params.length + 1}`;
+        params.push(limit);
+
+        const result = await db.query(queryText, params);
+        res.json({ success: true, count: result.rows.length, logs: result.rows });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // Diagnostic DB Status
@@ -553,6 +634,8 @@ async function processDeviceRegistration(data, socketId = null, remoteIp = null)
         deviceId,
         tenantId: finalTenantId,
         tenantCode: finalTenantCode,
+        companyId: finalTenantId,
+        companyCode: finalTenantCode,
         socketId: socketId || existing.socketId || null,
         brand: brand || existing.brand || 'Android',
         model: model || existing.model || 'Device',
@@ -578,6 +661,15 @@ async function processDeviceRegistration(data, socketId = null, remoteIp = null)
         locationUpdatedAt: (latitude !== undefined && latitude !== null) ? new Date().toISOString() : (existing.locationUpdatedAt ?? null),
         locationAddress: address || existing.locationAddress || null
     };
+
+    if (!existing.customerName && customerName && finalTenantId) {
+        logAudit({
+            companyId: finalTenantId,
+            deviceId,
+            eventType: 'DEVICE_CUSTOMER_BOUND',
+            payload: { customer: customerName, phone: customerPhone, loanId, model: `${brand || ''} ${model || ''}`.trim() }
+        });
+    }
 
     saveFleetState();
 
@@ -662,6 +754,20 @@ app.post('/api/devices/:deviceId/command', authMiddleware, (req, res) => {
     }
 
     console.log(`[DISPATCH COMMAND] Shop ${req.user.shopName} (${req.user.tenantCode}) sending ${command} to device: ${deviceId}`);
+
+    logAudit({
+        companyId: req.user.id,
+        deviceId,
+        eventType: 'DEVICE_COMMAND_' + command,
+        req,
+        payload: {
+            command,
+            customerName: target.customerName,
+            customerPhone: target.customerPhone,
+            loanId: target.loanId,
+            model: `${target.brand || ''} ${target.model || ''}`.trim()
+        }
+    });
 
     if (target.socketId) {
         io.to(target.socketId).emit('server_command', {
@@ -781,6 +887,20 @@ app.post('/api/devices/wallpaper', authMiddleware, async (req, res) => {
         }
 
         console.log(`[WALLPAPER DISPATCH] Shop ${req.user.shopName} dispatched wallpaper (${finalImageUrl}) to ${dispatchedCount} device(s).`);
+
+        logAudit({
+            companyId: req.user.id,
+            deviceId: deviceId || 'ALL',
+            eventType: 'WALLPAPER_PUSHED',
+            req,
+            payload: {
+                wallpaperUrl: finalImageUrl,
+                targetScreen,
+                lockChanges,
+                devicesAffected: dispatchedCount
+            }
+        });
+
         res.json({
             success: true,
             wallpaperUrl: finalImageUrl,
@@ -815,6 +935,15 @@ app.post('/api/devices/wallpaper/clear', authMiddleware, (req, res) => {
     }
 
     console.log(`[WALLPAPER CLEAR] Shop ${req.user.shopName} cleared wallpaper on ${dispatchedCount} device(s).`);
+
+    logAudit({
+        companyId: req.user.id,
+        deviceId: deviceId || 'ALL',
+        eventType: 'WALLPAPER_RESTORED_DEFAULT',
+        req,
+        payload: { devicesAffected: dispatchedCount }
+    });
+
     res.json({ success: true, message: `Default wallpaper restored on ${dispatchedCount} device(s).` });
 });
 
@@ -862,11 +991,18 @@ app.delete('/api/devices/:deviceId', authMiddleware, async (req, res) => {
     // 2. Delete from PostgreSQL Database
     if (db.isPostgresConnected()) {
         try {
-            await db.query('DELETE FROM devices WHERE device_id = $1 AND tenant_id = $2', [deviceId, req.user.id]);
-            await db.query(
-                `INSERT INTO audit_logs (tenant_id, device_id, event_type, ip_address, payload) VALUES ($1, $2, $3, $4, $5)`,
-                [req.user.id, deviceId, 'DEVICE_RELEASED_AND_DELETED', req.ip, JSON.stringify({ customer: target.customerName, phone: target.customerPhone })]
-            );
+            await db.query('DELETE FROM devices WHERE device_id = $1 AND (tenant_id = $2 OR company_id = $2)', [deviceId, req.user.id]);
+            await logAudit({
+                companyId: req.user.id,
+                deviceId,
+                eventType: 'DEVICE_RELEASED_AND_UNENROLLED',
+                req,
+                payload: {
+                    customerName: target.customerName,
+                    customerPhone: target.customerPhone,
+                    model: `${target.brand || ''} ${target.model || ''}`.trim()
+                }
+            });
             console.log(`[POSTGRESQL] Device ${deviceId} deleted from database.`);
         } catch (e) {
             console.error('[POSTGRESQL ERROR] Failed deleting device:', e.message);

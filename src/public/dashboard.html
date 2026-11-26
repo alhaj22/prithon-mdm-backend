@@ -1245,7 +1245,7 @@
         </div>
 
         <div class="shop-badge-container">
-            <div class="shop-code-label">Retailer Tenant Shop</div>
+            <div class="shop-code-label">Company Code</div>
             <div class="shop-code-val">
                 <span id="display-tenant-code">...</span>
                 <span style="font-size: 11px; color: var(--success); font-weight: 700;">● Active</span>
@@ -1306,6 +1306,13 @@
                     <span>Settlement Webhook</span>
                 </span>
             </a>
+            <a class="nav-item" href="javascript:void(0)" onclick="switchWorkspacePanel('panel-audit', this)">
+                <span style="display:flex; align-items:center; gap:10px;">
+                    <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                    <span>Audit &amp; Security Logs</span>
+                </span>
+            </a>
+        </div>
         </div>
 
         <div class="sidebar-footer">
@@ -1501,11 +1508,11 @@
                 <div class="card-panel-box">
                     <div class="card-panel-title">Scalefusion 6-Tap QR Provisioning Station</div>
                     <div class="card-panel-desc">
-                        Every device provisioned with this barcode or using your Shop Code will be permanently and exclusively enrolled into your shop fleet as a high-security Device Owner.
+                        Every device provisioned with this barcode or using your Company Code will be permanently and exclusively enrolled into your company fleet as a high-security Device Owner.
                     </div>
 
                     <div style="background: var(--brand-accent-subtle); border: 1px solid rgba(37,99,235,0.2); border-radius: 8px; padding: 14px 18px; margin-bottom: 20px;">
-                        <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 4px;">Assigned Retailer Shop Code</div>
+                        <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 4px;">Assigned Company Code</div>
                         <div style="font-size: 26px; font-weight: 800; color: var(--brand-accent); font-family: 'JetBrains Mono', monospace;" id="display-tenant-code-qr">LOADING...</div>
                         <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">
                             Enter this code in the app during registration or scan the QR code during fresh setup.
@@ -1821,6 +1828,62 @@
                 </div>
             </section>
 
+            <!-- 9. ENTERPRISE AUDIT & SECURITY TRAIL -->
+            <section id="panel-audit" class="workspace-panel">
+                <div class="card-panel-box">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 16px; flex-wrap:wrap; gap:12px;">
+                        <div>
+                            <div class="card-panel-title">Enterprise Audit &amp; Security Trail</div>
+                            <div class="card-panel-desc">
+                                Immutable chronological log of administrative logins, remote hardware lock/unlock dispatches, wallpaper changes, and compliance events.
+                            </div>
+                        </div>
+                        <button class="btn-topbar btn-topbar-secondary" onclick="fetchAuditLogs()">
+                            <svg style="width:14px; height:14px; stroke:currentColor; fill:none; stroke-width:2;" viewBox="0 0 24 24"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                            <span>Refresh Logs</span>
+                        </button>
+                    </div>
+
+                    <div class="metric-cards-grid" style="margin-bottom: 24px;">
+                        <div class="scalefusion-metric-card">
+                            <div class="metric-label">Total Events</div>
+                            <div class="metric-val" id="audit-total-count">0</div>
+                        </div>
+                        <div class="scalefusion-metric-card">
+                            <div class="metric-label">Command Dispatches</div>
+                            <div class="metric-val" id="audit-command-count">0</div>
+                        </div>
+                        <div class="scalefusion-metric-card">
+                            <div class="metric-label">Security &amp; Policy</div>
+                            <div class="metric-val" id="audit-security-count">0</div>
+                        </div>
+                        <div class="scalefusion-metric-card">
+                            <div class="metric-label">Admin Logins</div>
+                            <div class="metric-val" id="audit-login-count">0</div>
+                        </div>
+                    </div>
+
+                    <div style="overflow-x:auto;">
+                        <table class="scalefusion-table" style="width:100%; border-collapse:collapse;">
+                            <thead>
+                                <tr>
+                                    <th style="padding:12px; text-align:left; font-size:11px; text-transform:uppercase; color:var(--text-muted); border-bottom:1px solid var(--border);">Timestamp</th>
+                                    <th style="padding:12px; text-align:left; font-size:11px; text-transform:uppercase; color:var(--text-muted); border-bottom:1px solid var(--border);">Event Type</th>
+                                    <th style="padding:12px; text-align:left; font-size:11px; text-transform:uppercase; color:var(--text-muted); border-bottom:1px solid var(--border);">Target Device</th>
+                                    <th style="padding:12px; text-align:left; font-size:11px; text-transform:uppercase; color:var(--text-muted); border-bottom:1px solid var(--border);">Actor / IP</th>
+                                    <th style="padding:12px; text-align:left; font-size:11px; text-transform:uppercase; color:var(--text-muted); border-bottom:1px solid var(--border);">Payload &amp; Context</th>
+                                </tr>
+                            </thead>
+                            <tbody id="audit-table-body">
+                                <tr>
+                                    <td colspan="5" style="text-align:center; padding:32px; color:var(--text-muted);">Loading audit trail...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
         </div>
     </main>
 
@@ -2037,11 +2100,15 @@
                 'panel-policies': 'Hardware Kiosk Security Rules',
                 'panel-wallpaper': 'Remote Wallpaper Studio & Fleet Branding',
                 'panel-sms': '0-KB Silent SMS Hub',
-                'panel-webhooks': 'Payment Settlement Dispatch'
+                'panel-webhooks': 'Payment Settlement Dispatch',
+                'panel-audit': 'Enterprise Audit & Security Logs'
             };
             const breadcrumbEl = document.getElementById("topbar-current-view");
             if (breadcrumbEl && titleMap[panelId]) {
                 breadcrumbEl.innerText = titleMap[panelId];
+            }
+            if (panelId === 'panel-audit') {
+                fetchAuditLogs();
             }
         }
 
@@ -2825,6 +2892,72 @@
                 alert(data.message || 'Default wallpaper restored.');
             } catch (err) {
                 alert(`Error: ${err.message}`);
+            }
+        }
+
+        async function fetchAuditLogs() {
+            const tbody = document.getElementById('audit-table-body');
+            if (!tbody) return;
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:24px; color:var(--text-muted);">Fetching real-time audit logs...</td></tr>';
+
+            try {
+                const res = await fetch('/api/audit-logs', {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const data = await res.json();
+                const logs = data.logs || [];
+
+                let cmdCount = 0;
+                let secCount = 0;
+                let loginCount = 0;
+
+                logs.forEach(l => {
+                    const type = l.eventType || '';
+                    if (type.includes('COMMAND') || type.includes('WALLPAPER')) cmdCount++;
+                    if (type.includes('RELEASE') || type.includes('SECURITY') || type.includes('STATUS')) secCount++;
+                    if (type.includes('LOGIN') || type.includes('REGISTER')) loginCount++;
+                });
+
+                document.getElementById('audit-total-count').innerText = logs.length;
+                document.getElementById('audit-command-count').innerText = cmdCount;
+                document.getElementById('audit-security-count').innerText = secCount;
+                document.getElementById('audit-login-count').innerText = loginCount;
+
+                if (logs.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:32px; color:var(--text-muted);">No activity logs recorded yet.</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = '';
+                logs.forEach(log => {
+                    const tr = document.createElement('tr');
+                    tr.style.borderBottom = '1px solid var(--border)';
+
+                    const timeStr = log.createdAt ? new Date(log.createdAt).toLocaleString() : 'Just now';
+                    const payloadStr = typeof log.payload === 'object' ? JSON.stringify(log.payload, null, 1) : (log.payload || '{}');
+
+                    let badgeColor = '#2563eb';
+                    let badgeBg = 'rgba(37,99,235,0.1)';
+                    if (log.eventType?.includes('LOCK')) { badgeColor = '#ef4444'; badgeBg = 'rgba(239,68,68,0.1)'; }
+                    if (log.eventType?.includes('UNLOCK')) { badgeColor = '#10b981'; badgeBg = 'rgba(16,185,129,0.1)'; }
+                    if (log.eventType?.includes('WALLPAPER')) { badgeColor = '#8b5cf6'; badgeBg = 'rgba(139,92,246,0.1)'; }
+                    if (log.eventType?.includes('LOGIN')) { badgeColor = '#06b6d4'; badgeBg = 'rgba(6,182,212,0.1)'; }
+
+                    tr.innerHTML = `
+                        <td style="padding:12px; font-size:12px; font-family:'JetBrains Mono',monospace; color:var(--text-secondary); white-space:nowrap;">${timeStr}</td>
+                        <td style="padding:12px;">
+                            <span style="display:inline-block; padding:3px 8px; border-radius:4px; font-size:11px; font-weight:700; background:${badgeBg}; color:${badgeColor}; font-family:'JetBrains Mono',monospace;">
+                                ${log.eventType}
+                            </span>
+                        </td>
+                        <td style="padding:12px; font-size:12.5px; font-weight:600; color:var(--text-primary);">${log.deviceId || 'System / Account'}</td>
+                        <td style="padding:12px; font-size:12px; color:var(--text-muted); font-family:'JetBrains Mono',monospace;">${log.ipAddress || 'Internal'}</td>
+                        <td style="padding:12px; font-size:11.5px; color:var(--text-secondary); max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${payloadStr.replace(/"/g, '&quot;')}">${payloadStr}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (e) {
+                tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:24px; color:#ef4444;">Failed to load logs: ${e.message}</td></tr>`;
             }
         }
 

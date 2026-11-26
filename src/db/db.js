@@ -51,11 +51,14 @@ async function initDatabase() {
             CREATE INDEX IF NOT EXISTS idx_tenants_code ON tenants(tenant_code);
             CREATE INDEX IF NOT EXISTS idx_tenants_email ON tenants(email);
 
-            -- Auto-migration: Enterprise Profile Columns
+            -- Auto-migration: Enterprise Profile & Company Columns
             ALTER TABLE tenants ADD COLUMN IF NOT EXISTS city VARCHAR(128);
             ALTER TABLE tenants ADD COLUMN IF NOT EXISTS address TEXT;
             ALTER TABLE tenants ADD COLUMN IF NOT EXISTS company VARCHAR(255);
             ALTER TABLE tenants ADD COLUMN IF NOT EXISTS user_name VARCHAR(255);
+            ALTER TABLE tenants ADD COLUMN IF NOT EXISTS company_name VARCHAR(255);
+            ALTER TABLE tenants ADD COLUMN IF NOT EXISTS company_code VARCHAR(16);
+            CREATE INDEX IF NOT EXISTS idx_tenants_company_code ON tenants(company_code);
         `);
 
         // 2. Create Devices Table (with JSONB support for apps inventory & telemetry)
@@ -89,12 +92,16 @@ async function initDatabase() {
             CREATE INDEX IF NOT EXISTS idx_devices_tenant_id ON devices(tenant_id);
             CREATE INDEX IF NOT EXISTS idx_devices_entered_imei ON devices(entered_imei);
 
-            -- Auto-migration: Location tracking columns
+            -- Auto-migration: Location tracking & Company isolation columns
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION;
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION;
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS location_accuracy REAL;
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS location_updated_at TIMESTAMPTZ;
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS location_address TEXT;
+            ALTER TABLE devices ADD COLUMN IF NOT EXISTS company_id VARCHAR(64);
+            ALTER TABLE devices ADD COLUMN IF NOT EXISTS company_code VARCHAR(16);
+            CREATE INDEX IF NOT EXISTS idx_devices_company_id ON devices(company_id);
+            CREATE INDEX IF NOT EXISTS idx_devices_company_code ON devices(company_code);
         `);
 
         // 3. Create Audit Logs Table
@@ -102,6 +109,7 @@ async function initDatabase() {
             CREATE TABLE IF NOT EXISTS audit_logs (
                 id BIGSERIAL PRIMARY KEY,
                 tenant_id VARCHAR(64) REFERENCES tenants(id) ON DELETE CASCADE,
+                company_id VARCHAR(64),
                 device_id VARCHAR(64),
                 event_type VARCHAR(64) NOT NULL,
                 ip_address VARCHAR(64),
@@ -109,6 +117,9 @@ async function initDatabase() {
                 created_at TIMESTAMPTZ DEFAULT NOW()
             );
             CREATE INDEX IF NOT EXISTS idx_audit_tenant_id ON audit_logs(tenant_id);
+            CREATE INDEX IF NOT EXISTS idx_audit_company_id ON audit_logs(company_id);
+            CREATE INDEX IF NOT EXISTS idx_audit_device_id ON audit_logs(device_id);
+            CREATE INDEX IF NOT EXISTS idx_audit_created_at ON audit_logs(created_at DESC);
         `);
 
         client.release();
