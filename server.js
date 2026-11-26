@@ -52,9 +52,10 @@ app.get('/signup', (req, res) => {
 });
 
 app.get('/dashboard', (req, res) => {
-    const token = req.cookies?.accessToken || req.cookies?.access_token || req.cookies?.refreshToken || req.cookies?.refresh_token || req.cookies?.prithon_token;
-    if (!token) {
-        return res.redirect('/login');
+    const refreshToken = req.cookies?.refreshToken || req.cookies?.refresh_token;
+    if (!refreshToken || !verifyRefreshToken(refreshToken)) {
+        clearAuthCookies(res);
+        return res.redirect('/login?expired=1');
     }
     res.sendFile(path.join(__dirname, 'src', 'public', 'dashboard.html'));
 });
@@ -1248,7 +1249,7 @@ io.on('connection', (socket) => {
         let token = payload?.token;
         if (!token && socket.handshake.headers.cookie) {
             const parsed = parseCookieString(socket.handshake.headers.cookie);
-            token = parsed.accessToken || parsed.access_token || parsed.prithon_token || parsed.refreshToken || parsed.refresh_token;
+            token = parsed.accessToken || parsed.access_token || parsed.refreshToken || parsed.refresh_token;
         }
         const decoded = verifyToken(token);
         const tenantId = decoded ? (decoded.companyId || decoded.id || decoded.tenantId) : null;
@@ -1262,6 +1263,10 @@ io.on('connection', (socket) => {
             // Send initial tenant device list
             const tenantDevices = getTenantDevices(tenantId);
             socket.emit('device_list_updated', tenantDevices);
+        } else {
+            console.log('[SOCKET AUTH] No valid session found for socket. Disconnecting.');
+            socket.emit('session_expired');
+            socket.disconnect();
         }
     });
 

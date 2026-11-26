@@ -2052,6 +2052,29 @@
 
         let currentUser = null;
         let currentTenantCode = '';
+        let isSessionExpired = false;
+
+        function redirectToLogin(expired = false) {
+            if (isSessionExpired) return;
+            isSessionExpired = true;
+            if (sessionWatcher) clearInterval(sessionWatcher);
+            localStorage.removeItem("prithon_token");
+            localStorage.removeItem("prithon_user");
+            window.location.replace(expired ? '/login?expired=1' : '/login');
+        }
+
+        // Global Fetch Interceptor for 401 responses
+        const originalFetch = window.fetch;
+        window.fetch = async function(...args) {
+            const response = await originalFetch.apply(this, args);
+            if (response.status === 401) {
+                const url = typeof args[0] === 'string' ? args[0] : (args[0]?.url || '');
+                if (!url.includes('/api/auth/login') && !url.includes('/api/auth/signup')) {
+                    redirectToLogin(true);
+                }
+            }
+            return response;
+        };
 
         function updateTenantUI() {
             if (!currentUser) return;
@@ -2071,37 +2094,46 @@
             if (avatarEl) avatarEl.innerText = (displayName || "A").charAt(0).toUpperCase();
         }
 
-        // Verify active session via HttpOnly Cookie
+        // Verify active session via HttpOnly Cookie on load
         async function verifySession() {
             try {
                 const res = await fetch('/api/auth/me', { credentials: 'include' });
-                if (!res.ok) {
-                    window.location.replace('/login');
+                if (!res.ok || res.status === 401) {
+                    redirectToLogin(true);
                     return false;
                 }
                 const data = await res.json();
                 if (!data.success || !data.user) {
-                    window.location.replace('/login');
+                    redirectToLogin(true);
                     return false;
                 }
                 currentUser = data.user;
                 updateTenantUI();
                 return true;
             } catch (err) {
-                window.location.replace('/login');
+                redirectToLogin(true);
                 return false;
             }
         }
 
         verifySession();
 
+        // Active Session Watcher: Pings /api/auth/me every 4 seconds to guarantee immediate logout at 2 min
+        const sessionWatcher = setInterval(async () => {
+            if (isSessionExpired) return;
+            try {
+                const res = await fetch('/api/auth/me', { credentials: 'include' });
+                if (res.status === 401) {
+                    redirectToLogin(true);
+                }
+            } catch (e) {}
+        }, 4000);
+
         document.getElementById("btn-logout")?.addEventListener("click", async () => {
             try {
                 await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
             } catch (e) {}
-            localStorage.removeItem("prithon_token");
-            localStorage.removeItem("prithon_user");
-            window.location.replace("/login");
+            redirectToLogin(false);
         });
 
         // Workspace Panel Switching

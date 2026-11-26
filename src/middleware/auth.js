@@ -112,50 +112,50 @@ function clearAuthCookies(res) {
 }
 
 async function authMiddleware(req, res, next) {
-    // 1. Check access token from Cookie, Authorization Header, or Query
-    let accessToken = req.cookies?.accessToken || req.cookies?.access_token || req.cookies?.prithon_token;
+    // 1. Strict 2-minute session boundary: Refresh Token MUST be present and valid
+    const refreshToken = req.cookies?.refreshToken || req.cookies?.refresh_token;
+    if (!refreshToken) {
+        console.log('[AUTH DEBUG] No refresh token in cookies. Terminating session.');
+        clearAuthCookies(res);
+        return res.status(401).json({ error: 'Session expired. Please log in again.' });
+    }
+
+    const decodedRefresh = verifyRefreshToken(refreshToken);
+    if (!decodedRefresh) {
+        console.log('[AUTH DEBUG] Refresh Token expired (2m lifetime reached). Auto logout triggered!');
+        clearAuthCookies(res);
+        return res.status(401).json({ error: 'Session expired after 2 minutes. Please log in again.' });
+    }
+
+    const targetId = decodedRefresh.companyId || decodedRefresh.id || decodedRefresh.tenantId;
+    const tenant = await findTenantById(targetId);
+    if (!tenant) {
+        clearAuthCookies(res);
+        return res.status(401).json({ error: 'Company account not found.' });
+    }
+
+    // 2. Check 1-minute Access Token
+    let accessToken = req.cookies?.accessToken || req.cookies?.access_token;
     if (!accessToken && req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
         accessToken = req.headers.authorization.split(' ')[1];
-    } else if (!accessToken && req.query && req.query.token) {
-        accessToken = req.query.token;
     }
 
     if (accessToken) {
-        const decoded = verifyAccessToken(accessToken);
-        if (decoded) {
-            const targetId = decoded.companyId || decoded.id || decoded.tenantId;
-            const tenant = await findTenantById(targetId);
-            if (tenant) {
-                req.user = tenant;
-                return next();
-            }
-        } else {
-            console.log('[AUTH DEBUG] Access Token expired (1m lifetime reached). Checking Refresh Token...');
+        const decodedAccess = verifyAccessToken(accessToken);
+        if (decodedAccess) {
+            req.user = tenant;
+            return next();
         }
+        console.log('[AUTH DEBUG] Access Token expired (1m reached). Silently refreshing using valid Refresh Token...');
     }
 
-    // 2. Access token missing or expired -> Check Refresh Token from Cookies
-    const refreshToken = req.cookies?.refreshToken || req.cookies?.refresh_token;
-    if (refreshToken) {
-        const decodedRefresh = verifyRefreshToken(refreshToken);
-        if (decodedRefresh) {
-            const targetId = decodedRefresh.companyId || decodedRefresh.id || decodedRefresh.tenantId;
-            const tenant = await findTenantById(targetId);
-            if (tenant) {
-                // Transparent silent refresh: issue new access token cookie
-                console.log(`[AUTH DEBUG] Refresh Token valid (within 2m). Silently refreshed Access Token for: ${tenant.companyName || tenant.email}`);
-                const newAccessToken = generateAccessToken(tenant);
-                res.cookie('accessToken', newAccessToken, COOKIE_OPTIONS_ACCESS);
-                res.cookie('prithon_token', newAccessToken, COOKIE_OPTIONS_ACCESS);
-                req.user = tenant;
-                return next();
-            }
-        } else {
-            console.log('[AUTH DEBUG] Refresh Token expired (2m lifetime reached). Session completely ended.');
-        }
-    }
-
-    return res.status(401).json({ error: 'Authentication required. Session expired or missing cookies.' });
+    // 3. Access Token expired/missing, but Refresh Token is valid -> Silent refresh
+    const newAccessToken = generateAccessToken(tenant);
+    res.cookie('accessToken', newAccessToken, COOKIE_OPTIONS_ACCESS);
+    res.cookie('prithon_token', newAccessToken, COOKIE_OPTIONS_ACCESS);
+    req.user = tenant;
+    console.log(`[AUTH DEBUG] Silently refreshed 1m Access Token for: ${tenant.companyName || tenant.email}`);
+    return next();
 }
 
 module.exports = {

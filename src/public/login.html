@@ -273,15 +273,24 @@
         // Clean any legacy localStorage tokens
         localStorage.removeItem('prithon_token');
 
-        // Check active session via HttpOnly Cookie
-        fetch('/api/auth/me', { credentials: 'include' })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success && data.user) {
-                    window.location.replace('/dashboard');
-                }
-            })
-            .catch(() => {});
+        const errorBanner = document.getElementById('errorBanner');
+        const errorMsg = document.getElementById('errorMsg');
+        const urlParams = new URLSearchParams(window.location.search);
+
+        if (urlParams.get('expired') === '1') {
+            errorMsg.innerText = '⚠️ Your 2-minute session has expired. Please sign in again.';
+            errorBanner.style.display = 'flex';
+        } else {
+            // Check active session via HttpOnly Cookie
+            fetch('/api/auth/me', { credentials: 'include' })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success && data.user) {
+                        window.location.replace('/dashboard');
+                    }
+                })
+                .catch(() => {});
+        }
 
         const loginForm = document.getElementById('loginForm');
         const errorBanner = document.getElementById('errorBanner');
