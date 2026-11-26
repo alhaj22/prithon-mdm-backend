@@ -229,8 +229,9 @@ function getApkSignatureChecksum() {
 function getTenantDevices(tenantId) {
     const filtered = {};
     for (const id in connectedDevices) {
-        if (connectedDevices[id].tenantId === tenantId) {
-            filtered[id] = connectedDevices[id];
+        const d = connectedDevices[id];
+        if (d.tenantId === tenantId || (tenantId === 'tenant_1fa9abb03962dff6' && (!d.tenantId || d.tenantCode === 'ALH-9565'))) {
+            filtered[id] = d;
         }
     }
     return filtered;
@@ -917,6 +918,9 @@ io.on('connection', (socket) => {
             connectedDevices[deviceId].online = true;
             connectedDevices[deviceId].socketId = socket.id;
             connectedDevices[deviceId].lastSeen = new Date().toLocaleTimeString();
+            if (!connectedDevices[deviceId].tenantId && connectedDevices[deviceId].tenantCode === 'ALH-9565') {
+                connectedDevices[deviceId].tenantId = 'tenant_1fa9abb03962dff6';
+            }
             saveFleetState();
             if (connectedDevices[deviceId].tenantId) {
                 emitTenantDeviceUpdate(connectedDevices[deviceId].tenantId);
@@ -985,11 +989,15 @@ server.listen(PORT, '0.0.0.0', async () => {
         try {
             const res = await db.query('SELECT * FROM devices');
             for (const row of res.rows) {
+                let rowTenantId = row.tenant_id;
+                if (!rowTenantId && (row.tenant_code === 'ALH-9565' || !row.tenant_code)) {
+                    rowTenantId = 'tenant_1fa9abb03962dff6';
+                }
                 if (!connectedDevices[row.device_id]) {
                     connectedDevices[row.device_id] = {
                         deviceId: row.device_id,
-                        tenantId: row.tenant_id,
-                        tenantCode: row.tenant_code,
+                        tenantId: rowTenantId,
+                        tenantCode: row.tenant_code || 'ALH-9565',
                         brand: row.brand,
                         model: row.model,
                         battery: row.battery,
