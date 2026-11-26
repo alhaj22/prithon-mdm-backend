@@ -632,14 +632,30 @@ app.post('/api/devices/wallpaper', authMiddleware, async (req, res) => {
             const filePath = path.join(uploadsDir, filename);
             fs.writeFileSync(filePath, dataBuffer);
             
-            // Build absolute URL for the phone to download
-            const protocol = req.protocol;
-            const host = req.get('host');
-            finalImageUrl = `${protocol}://${host}/uploads/wallpapers/${filename}`;
+            // Build absolute URL for the phone to download (must use reachable LAN IP, not localhost)
+            const protocol = req.protocol || 'http';
+            let reachableHost = req.get('host') || `${SERVER_HOST}:${PORT}`;
+            if (reachableHost.includes('localhost') || reachableHost.includes('127.0.0.1')) {
+                reachableHost = `${SERVER_HOST}:${PORT}`;
+            }
+            finalImageUrl = `${protocol}://${reachableHost}/uploads/wallpapers/${filename}`;
         }
         
         if (!finalImageUrl) {
             return res.status(400).json({ error: 'Please select an image file or provide a wallpaper URL.' });
+        }
+
+        // Ensure relative URLs (like /wallpapers/preset_minimal.jpg) have full protocol and reachable LAN host
+        const protocol = req.protocol || 'http';
+        let reachableHost = req.get('host') || `${SERVER_HOST}:${PORT}`;
+        if (reachableHost.includes('localhost') || reachableHost.includes('127.0.0.1')) {
+            reachableHost = `${SERVER_HOST}:${PORT}`;
+        }
+
+        if (finalImageUrl.startsWith('/')) {
+            finalImageUrl = `${protocol}://${reachableHost}${finalImageUrl}`;
+        } else if (finalImageUrl.includes('localhost:') || finalImageUrl.includes('127.0.0.1:')) {
+            finalImageUrl = finalImageUrl.replace(/localhost:[0-9]+/g, `${SERVER_HOST}:${PORT}`).replace(/127\.0\.0\.1:[0-9]+/g, `${SERVER_HOST}:${PORT}`);
         }
 
         const tenantDevices = Object.values(connectedDevices).filter(d => d.tenantId === req.user.id);
