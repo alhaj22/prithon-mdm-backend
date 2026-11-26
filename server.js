@@ -645,9 +645,22 @@ app.post('/api/devices/wallpaper', authMiddleware, async (req, res) => {
         let dispatchedCount = 0;
 
         if (deviceId && deviceId !== 'all') {
-            const target = connectedDevices[deviceId];
-            if (!target || target.tenantId !== req.user.id) {
-                return res.status(404).json({ error: 'Target device not found or offline.' });
+            let target = connectedDevices[deviceId];
+            if (!target) {
+                // Also search by deviceId, id, hardwareImei, or enteredImei across tenant devices
+                target = tenantDevices.find(d => 
+                    d.deviceId === deviceId || 
+                    d.id === deviceId || 
+                    d.hardwareImei === deviceId || 
+                    d.enteredImei === deviceId
+                );
+            }
+            if (!target && tenantDevices.length === 1) {
+                // If only 1 phone is enrolled, fallback to it gracefully
+                target = tenantDevices[0];
+            }
+            if (!target) {
+                return res.status(404).json({ error: 'Target device not found in your fleet.' });
             }
             if (target.socketId) {
                 io.to(target.socketId).emit('server_command', {
@@ -657,6 +670,8 @@ app.post('/api/devices/wallpaper', authMiddleware, async (req, res) => {
                     lockChanges: lockChanges !== false
                 });
                 dispatchedCount = 1;
+            } else {
+                return res.status(400).json({ error: `Device ${target.model || target.deviceId} is registered but currently offline (no active socket).` });
             }
         } else {
             tenantDevices.forEach(d => {
@@ -670,6 +685,9 @@ app.post('/api/devices/wallpaper', authMiddleware, async (req, res) => {
                     dispatchedCount++;
                 }
             });
+            if (dispatchedCount === 0 && tenantDevices.length > 0) {
+                return res.status(400).json({ error: 'All devices in your fleet are currently offline.' });
+            }
         }
 
         console.log(`[WALLPAPER DISPATCH] Shop ${req.user.shopName} dispatched wallpaper (${finalImageUrl}) to ${dispatchedCount} device(s).`);
