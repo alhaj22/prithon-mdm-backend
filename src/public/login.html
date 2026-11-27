@@ -282,7 +282,7 @@
         const urlParams = new URLSearchParams(window.location.search);
 
         if (urlParams.get('expired') === '1') {
-            errorMsg.innerText = '⚠️ Your session has expired. Please sign in again.';
+            errorMsg.innerText = 'Your session has expired. Please sign in again.';
             errorBanner.style.display = 'flex';
         } else {
             // Check active session via HttpOnly Cookie
