@@ -130,10 +130,10 @@ async function persistDeviceToPostgres(dev) {
                 device_id, tenant_id, tenant_code, company_id, company_code, brand, model, battery, android_version,
                 status, online, ip, last_seen, is_device_owner, customer_name, customer_phone,
                 loan_id, emi_amount, due_date, entered_imei, hardware_imei, imei_verified, imei_status, apps,
-                latitude, longitude, location_accuracy, location_updated_at, location_address, updated_at
+                latitude, longitude, location_accuracy, location_updated_at, location_address, is_app_hidden, updated_at
             ) VALUES (
                 $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22,
-                $23, $24, $25, $26, $27, $28, $29, NOW()
+                $23, $24, $25, $26, $27, $28, $29, $30, NOW()
             )
             ON CONFLICT (device_id) DO UPDATE SET
                 tenant_id = EXCLUDED.tenant_id,
@@ -164,6 +164,7 @@ async function persistDeviceToPostgres(dev) {
                 location_accuracy = COALESCE(EXCLUDED.location_accuracy, devices.location_accuracy),
                 location_updated_at = COALESCE(EXCLUDED.location_updated_at, devices.location_updated_at),
                 location_address = COALESCE(EXCLUDED.location_address, devices.location_address),
+                is_app_hidden = COALESCE(EXCLUDED.is_app_hidden, devices.is_app_hidden),
                 updated_at = NOW();
         `;
         let validTenantId = dev.companyId || dev.tenantId || null;
@@ -208,7 +209,8 @@ async function persistDeviceToPostgres(dev) {
             dev.longitude !== undefined && dev.longitude !== null ? dev.longitude : null,
             dev.locationAccuracy !== undefined && dev.locationAccuracy !== null ? dev.locationAccuracy : null,
             dev.locationUpdatedAt || null,
-            dev.locationAddress || null
+            dev.locationAddress || null,
+            dev.isAppHidden !== undefined ? !!dev.isAppHidden : false
         ]);
     } catch (e) {
         console.error('[POSTGRESQL] Failed to persist device:', e.message);
@@ -836,7 +838,8 @@ async function processDeviceRegistration(data, socketId = null, remoteIp = null)
         longitude: longitude !== undefined && longitude !== null ? Number(longitude) : (existing.longitude ?? null),
         locationAccuracy: accuracy !== undefined && accuracy !== null ? Number(accuracy) : (existing.locationAccuracy ?? null),
         locationUpdatedAt: (latitude !== undefined && latitude !== null) ? new Date().toISOString() : (existing.locationUpdatedAt ?? null),
-        locationAddress: address || existing.locationAddress || null
+        locationAddress: address || existing.locationAddress || null,
+        isAppHidden: data.isAppHidden !== undefined ? !!data.isAppHidden : (existing.isAppHidden ?? false)
     };
 
     if (!existing.customerName && customerName && finalTenantId) {
@@ -962,6 +965,8 @@ app.post('/api/devices/:deviceId/command', authMiddleware, (req, res) => {
     // Optimistically update status
     if (command === 'LOCK') target.status = 'LOCKED';
     if (command === 'UNLOCK') target.status = 'NORMAL';
+    if (command === 'HIDE_APP') target.isAppHidden = true;
+    if (command === 'UNHIDE_APP') target.isAppHidden = false;
     saveFleetState();
     emitTenantDeviceUpdate(req.user.id);
 
@@ -1313,10 +1318,11 @@ io.on('connection', (socket) => {
     });
 
     // Periodic heartbeat from phone with battery, status and GPS coordinates
-    socket.on('heartbeat', ({ deviceId, battery, status, customerName, customerPhone, loanId, emiAmount, enteredImei, hardwareImei, latitude, longitude, accuracy }) => {
+    socket.on('heartbeat', ({ deviceId, battery, status, customerName, customerPhone, loanId, emiAmount, enteredImei, hardwareImei, latitude, longitude, accuracy, isAppHidden }) => {
         if (connectedDevices[deviceId]) {
             if (battery !== undefined) connectedDevices[deviceId].battery = battery;
             if (status !== undefined) connectedDevices[deviceId].status = status;
+            if (isAppHidden !== undefined) connectedDevices[deviceId].isAppHidden = !!isAppHidden;
             if (customerName) connectedDevices[deviceId].customerName = customerName;
             if (customerPhone) connectedDevices[deviceId].customerPhone = customerPhone;
             if (loanId) connectedDevices[deviceId].loanId = loanId;
@@ -1355,6 +1361,18 @@ io.on('connection', (socket) => {
             connectedDevices[deviceId].lastSeen = new Date().toLocaleTimeString();
             saveFleetState();
             console.log(`[GPS LOCATION] Device ${deviceId} -> Lat: ${latitude}, Lng: ${longitude} (±${accuracy}m)`);
+            if (connectedDevices[deviceId].tenantId) {
+                emitTenantDeviceUpdate(connectedDevices[deviceId].tenantId);
+            }
+        }
+    });
+
+    // Device stealth / app hidden state change notification
+    socket.on('device_app_hidden_changed', ({ deviceId, isAppHidden }) => {
+        if (connectedDevices[deviceId]) {
+            connectedDevices[deviceId].isAppHidden = !!isAppHidden;
+            saveFleetState();
+            console.log(`[APP VISIBILITY] Device ${deviceId} isAppHidden: ${!!isAppHidden}`);
             if (connectedDevices[deviceId].tenantId) {
                 emitTenantDeviceUpdate(connectedDevices[deviceId].tenantId);
             }
@@ -1436,7 +1454,8 @@ server.listen(PORT, '0.0.0.0', async () => {
                         longitude: row.longitude !== null && row.longitude !== undefined ? Number(row.longitude) : null,
                         locationAccuracy: row.location_accuracy !== null && row.location_accuracy !== undefined ? Number(row.location_accuracy) : null,
                         locationUpdatedAt: row.location_updated_at ? new Date(row.location_updated_at).toISOString() : null,
-                        locationAddress: row.location_address || null
+                        locationAddress: row.location_address || null,
+                        isAppHidden: row.is_app_hidden !== null && row.is_app_hidden !== undefined ? !!row.is_app_hidden : false
                     };
                 }
             }

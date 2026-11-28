@@ -100,6 +100,7 @@ async function initDatabase() {
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS location_address TEXT;
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS company_id VARCHAR(64);
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS company_code VARCHAR(16);
+            ALTER TABLE devices ADD COLUMN IF NOT EXISTS is_app_hidden BOOLEAN DEFAULT FALSE;
             CREATE INDEX IF NOT EXISTS idx_devices_company_id ON devices(company_id);
             CREATE INDEX IF NOT EXISTS idx_devices_company_code ON devices(company_code);
         `);
